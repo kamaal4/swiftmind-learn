@@ -1,36 +1,50 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# SwiftMind
 
-## Getting Started
+**Understand iOS. Don't just memorise it.**
 
-First, run the development server:
+A learning platform for iOS developers: Swift, memory management, concurrency, UIKit and SwiftUI, from beginner to senior level. Every concept is a structured lesson — a plain-English explanation, a real-world analogy, a diagram you can step through, real code, the common mistake, a quick check, and the interview question behind it. Never a wall of prose.
+
+**Live at [kamaal4.github.io/swiftmind-learn](https://kamaal4.github.io/swiftmind-learn/)**
+
+This is the web companion to the SwiftMind iOS app. Content and learning logic are shared with the app rather than reinvented, so the two stay in step.
+
+## What's in it
+
+- **17 concepts** across 5 tracks, 171 authored sections, 13 interactive diagrams
+- **51 quiz questions** feeding a Leitner spaced-repetition schedule (1 → 3 → 7 → 16 → 35 days)
+- **17 interview questions** by level, junior through staff, with what an interviewer listens for
+- **Release Radar** — Swift and iOS changes, deprecations, and what to migrate
+- Works offline, installable as a PWA
+
+No accounts, no backend, no tracking. Progress is stored in your browser only, and you can export it to a file at any time.
+
+## Development
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
+npm run dev              # http://localhost:3000
+
+npm test                 # ported from the iOS app's XCTest suite
+npm run content:check    # validates content JSON and every cross-reference
+npm run lint
+npm run build            # static export to out/
+npm start                # serve out/ locally
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Node 26 runs TypeScript natively, so the tests and scripts need no transpiler.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Adding a concept means adding JSON under `src/content/data/` and running `npm run content:check` — no code change required.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Deploying
 
-## Learn More
+The site is a static export served from GitHub Pages at `/swiftmind-learn`:
 
-To learn more about Next.js, take a look at the following resources:
+```bash
+NEXT_PUBLIC_BASE_PATH=/swiftmind-learn npm run build:pages
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+`NEXT_PUBLIC_BASE_PATH` is read from the environment rather than hardcoded, so the same build serves a domain root unchanged.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Licence
 
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Content and code © Mohammed Mustafa Kamaal.
