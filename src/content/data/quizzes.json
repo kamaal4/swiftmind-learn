@@ -1,0 +1,1301 @@
+[
+  {
+    "id": "q-optionals-1",
+    "conceptID": "optionals",
+    "categoryID": "swift",
+    "kind": "multipleChoice",
+    "prompt": "What does `if let name = maybeName` actually do?",
+    "options": [
+      {
+        "id": "a",
+        "text": "Checks whether maybeName is not nil, leaving it optional inside the block"
+      },
+      {
+        "id": "b",
+        "text": "Binds the unwrapped value to a new non-optional constant, and runs the block only if a value was present"
+      },
+      {
+        "id": "c",
+        "text": "Crashes if maybeName is nil"
+      },
+      {
+        "id": "d",
+        "text": "Converts maybeName to an implicitly unwrapped optional"
+      }
+    ],
+    "correctOptionID": "b",
+    "explanation": "Optional binding pattern-matches the `.some` case and binds its associated value. Inside the block `name` has the *wrapped* type — `String`, not `String?` — which is the whole point: after the check, the compiler knows a value exists. It never crashes; the nil path simply skips the block.",
+    "difficulty": "beginner"
+  },
+  {
+    "id": "q-optionals-2",
+    "conceptID": "optionals",
+    "categoryID": "swift",
+    "kind": "whatHappensNext",
+    "prompt": "What is printed?",
+    "code": "let name: String? = nil\nprint(name?.count as Any)",
+    "options": [
+      {
+        "id": "a",
+        "text": "Optional(4)"
+      },
+      {
+        "id": "b",
+        "text": "4"
+      },
+      {
+        "id": "c",
+        "text": "nil"
+      },
+      {
+        "id": "d",
+        "text": "It doesn't compile"
+      }
+    ],
+    "correctOptionID": "c",
+    "explanation": "Optional chaining short-circuits. `name` is nil, so `name?.count` never calls `count` at all and evaluates to nil of type `Int?`. Nothing crashes — that's the difference between `?.` and `!.`. Note the result is `Int?` even though `count` returns `Int`: chaining always adds a layer of optionality.",
+    "difficulty": "beginner"
+  },
+  {
+    "id": "q-optionals-3",
+    "conceptID": "optionals",
+    "categoryID": "swift",
+    "kind": "trueFalse",
+    "prompt": "`UIView?` uses more memory than `UIView`.",
+    "options": [
+      {
+        "id": "true",
+        "text": "True"
+      },
+      {
+        "id": "false",
+        "text": "False"
+      }
+    ],
+    "correctOptionID": "false",
+    "explanation": "For class references and other pointer-shaped types, Swift stores `.none` as the all-zeroes pointer — a spare-bit representation — so the optional is the same size as the non-optional. Optionals around types with no spare bits (some structs) can need an extra tag byte, but the pointer case is free.",
+    "difficulty": "advanced"
+  },
+  {
+    "id": "q-closures-1",
+    "conceptID": "closures",
+    "categoryID": "swift",
+    "kind": "whatHappensNext",
+    "prompt": "What does this print?",
+    "code": "func makeCounter() -> () -> Int {\n    var count = 0\n    return { count += 1; return count }\n}\nlet next = makeCounter()\nprint(next(), next())",
+    "options": [
+      {
+        "id": "a",
+        "text": "0 0"
+      },
+      {
+        "id": "b",
+        "text": "1 2"
+      },
+      {
+        "id": "c",
+        "text": "1 1"
+      },
+      {
+        "id": "d",
+        "text": "2 2"
+      }
+    ],
+    "correctOptionID": "b",
+    "explanation": "Both calls go through the same closure, which captured the *variable* `count`, not its value at the time of capture. The captured storage is promoted to a heap box that outlives `makeCounter`, so the increments accumulate. If closures copied values at capture time you'd see `1 1`.",
+    "difficulty": "intermediate"
+  },
+  {
+    "id": "q-closures-2",
+    "conceptID": "closures",
+    "categoryID": "swift",
+    "kind": "multipleChoice",
+    "prompt": "Why does Swift make you write `self.` inside an `@escaping` closure but not a non-escaping one?",
+    "options": [
+      {
+        "id": "a",
+        "text": "Escaping closures run on a background thread, so the compiler needs the extra clarity"
+      },
+      {
+        "id": "b",
+        "text": "Because an escaping closure can outlive the call, capturing self is a lifetime decision the compiler wants you to make visibly"
+      },
+      {
+        "id": "c",
+        "text": "It's a style rule enforced by the compiler with no runtime meaning"
+      },
+      {
+        "id": "d",
+        "text": "Non-escaping closures don't capture self at all"
+      }
+    ],
+    "correctOptionID": "b",
+    "explanation": "A non-escaping closure provably doesn't outlive the call, so capturing `self` can't extend its lifetime and there's nothing to decide. An escaping closure may be stored and called later, so capturing `self` keeps the object alive until the closure is released — the classic retain-cycle setup. The mandatory `self.` is the compiler making that choice explicit. It has nothing to do with threading.",
+    "difficulty": "intermediate"
+  },
+  {
+    "id": "q-closures-3",
+    "conceptID": "closures",
+    "categoryID": "swift",
+    "kind": "trueFalse",
+    "prompt": "Marking a closure parameter `@escaping` can make it slower.",
+    "options": [
+      {
+        "id": "true",
+        "text": "True"
+      },
+      {
+        "id": "false",
+        "text": "False"
+      }
+    ],
+    "correctOptionID": "true",
+    "explanation": "Yes — a non-escaping closure's captured context can live on the stack, because the compiler knows it dies with the call. `@escaping` forces a heap-allocated, reference-counted context box. It's usually irrelevant, but in a hot loop it's real.",
+    "difficulty": "advanced"
+  },
+  {
+    "id": "q-struct-vs-class-1",
+    "conceptID": "struct-vs-class",
+    "categoryID": "swift",
+    "kind": "multipleChoice",
+    "prompt": "Why does `stillMutable.x = 1` compile when `stillMutable` is declared with `let`?",
+    "code": "final class PointRef { var x = 0 }\nlet stillMutable = PointRef()\nstillMutable.x = 1",
+    "options": [
+      {
+        "id": "a",
+        "text": "`let` only applies to structs"
+      },
+      {
+        "id": "b",
+        "text": "`let` makes the reference constant, not the object it points to; the object's own vars are still mutable"
+      },
+      {
+        "id": "c",
+        "text": "Classes ignore `let` entirely"
+      },
+      {
+        "id": "d",
+        "text": "It doesn't compile"
+      }
+    ],
+    "correctOptionID": "b",
+    "explanation": "For a class, the constant is the pointer. You can't reassign `stillMutable` to a different instance, but you can mutate the instance it points at. For a struct, the value *is* the storage, so `let` freezes the whole thing including its properties. This is the single most common source of accidental shared mutation.",
+    "difficulty": "beginner"
+  },
+  {
+    "id": "q-struct-vs-class-2",
+    "conceptID": "struct-vs-class",
+    "categoryID": "swift",
+    "kind": "multipleChoice",
+    "prompt": "Copying a Swift `Array` with a million elements does what?",
+    "options": [
+      {
+        "id": "a",
+        "text": "Copies all million elements immediately"
+      },
+      {
+        "id": "b",
+        "text": "Copies nothing; both share one buffer until one of them is mutated"
+      },
+      {
+        "id": "c",
+        "text": "Copies nothing ever, because Array is a reference type"
+      },
+      {
+        "id": "d",
+        "text": "Copies elements lazily as they're read"
+      }
+    ],
+    "correctOptionID": "b",
+    "explanation": "`Array` is a struct wrapping a reference to a heap buffer. Assignment copies the small struct and bumps the buffer's reference count. On mutation, the array checks `isKnownUniquelyReferenced` — if the buffer is shared it duplicates first, otherwise it mutates in place. That's copy-on-write, and it's what makes value semantics practical.",
+    "difficulty": "intermediate"
+  },
+  {
+    "id": "q-struct-vs-class-3",
+    "conceptID": "struct-vs-class",
+    "categoryID": "swift",
+    "kind": "trueFalse",
+    "prompt": "A struct is always allocated on the stack.",
+    "options": [
+      {
+        "id": "true",
+        "text": "True"
+      },
+      {
+        "id": "false",
+        "text": "False"
+      }
+    ],
+    "correctOptionID": "false",
+    "explanation": "Only when it's a local variable. A struct that's a property of a class instance lives on the heap inside that instance, and a struct captured by an escaping closure lives in the closure's heap context box. Stack vs heap is about where the value is stored, not about struct vs class.",
+    "difficulty": "advanced"
+  },
+  {
+    "id": "q-protocols-1",
+    "conceptID": "protocols",
+    "categoryID": "swift",
+    "kind": "multipleChoice",
+    "prompt": "What's the practical difference between `some P` and `any P` as a return type?",
+    "options": [
+      {
+        "id": "a",
+        "text": "None; `some` is just newer syntax for `any`"
+      },
+      {
+        "id": "b",
+        "text": "`some P` is one specific type fixed at compile time with static dispatch; `any P` is an existential box with dynamic dispatch that can hold different types"
+      },
+      {
+        "id": "c",
+        "text": "`some P` allows returning different types on different calls, `any P` doesn't"
+      },
+      {
+        "id": "d",
+        "text": "`any P` is only allowed for class-bound protocols"
+      }
+    ],
+    "correctOptionID": "b",
+    "explanation": "`some P` is an opaque type: the compiler knows exactly which concrete type it is, the caller doesn't, and every call returns that *same* type. `any P` boxes the value with a witness table so calls dispatch dynamically and different calls can return different types. Option (c) has it exactly backwards — that flexibility is `any`'s, not `some`'s.",
+    "difficulty": "advanced"
+  },
+  {
+    "id": "q-protocols-2",
+    "conceptID": "protocols",
+    "categoryID": "swift",
+    "kind": "multipleChoice",
+    "prompt": "You want to store a mixed collection of loaders in one array. What's the type?",
+    "options": [
+      {
+        "id": "a",
+        "text": "`[some ContentLoading]`"
+      },
+      {
+        "id": "b",
+        "text": "`[any ContentLoading]`"
+      },
+      {
+        "id": "c",
+        "text": "`[ContentLoading.Type]`"
+      },
+      {
+        "id": "d",
+        "text": "`[ContentLoading.Protocol]`"
+      }
+    ],
+    "correctOptionID": "b",
+    "explanation": "The elements are different concrete types, which is exactly the case existentials exist for. `[some ContentLoading]` would require every element to be the same compile-time type, defeating the purpose. `.Type` would be an array of *metatypes* — the types themselves, not instances of them.",
+    "difficulty": "intermediate"
+  },
+  {
+    "id": "q-protocols-3",
+    "conceptID": "protocols",
+    "categoryID": "swift",
+    "kind": "trueFalse",
+    "prompt": "A protocol extension can add a default implementation that conforming types may override.",
+    "options": [
+      {
+        "id": "true",
+        "text": "True"
+      },
+      {
+        "id": "false",
+        "text": "False"
+      }
+    ],
+    "correctOptionID": "true",
+    "explanation": "Yes — that's how `Collection` gives you `map`, `filter` and dozens more for free. One sharp edge: if the member is only in the extension and not a protocol *requirement*, the call dispatches statically on the declared type, so an \"override\" won't be picked up through an `any P` reference. Declaring it as a requirement fixes that.",
+    "difficulty": "advanced"
+  },
+  {
+    "id": "q-arc-1",
+    "conceptID": "arc",
+    "categoryID": "memory",
+    "kind": "multipleChoice",
+    "prompt": "Which of these does NOT increase an object's strong reference count?",
+    "options": [
+      {
+        "id": "a",
+        "text": "Assigning it to a new `let` constant"
+      },
+      {
+        "id": "b",
+        "text": "Capturing it strongly in an escaping closure"
+      },
+      {
+        "id": "c",
+        "text": "Assigning it to a `weak var`"
+      },
+      {
+        "id": "d",
+        "text": "Storing it in an array"
+      }
+    ],
+    "correctOptionID": "c",
+    "explanation": "`weak` and `unowned` both deliberately avoid incrementing the strong count — that's their entire purpose. Everything else that makes a strong reference bumps it, including closure captures and collection storage, which is why an array of view controllers keeps them all alive. `weak` additionally registers in a side table so the reference can be zeroed to nil when the object dies; `unowned` doesn't, which is why it traps instead.",
+    "difficulty": "intermediate"
+  },
+  {
+    "id": "q-arc-2",
+    "conceptID": "arc",
+    "categoryID": "memory",
+    "kind": "multipleChoice",
+    "prompt": "When does `deinit` run?",
+    "options": [
+      {
+        "id": "a",
+        "text": "At the end of the current run loop iteration"
+      },
+      {
+        "id": "b",
+        "text": "Immediately, the moment the last strong reference is released"
+      },
+      {
+        "id": "c",
+        "text": "When the system is under memory pressure"
+      },
+      {
+        "id": "d",
+        "text": "On the next garbage collection pass"
+      }
+    ],
+    "correctOptionID": "b",
+    "explanation": "ARC is deterministic. There's no collector and no deferred sweep — the release that takes the count to zero calls `deinit` synchronously, on that thread, right there. This is why `deinit` is a reasonable place to remove an observer or close a handle, and why an object appearing to outlive its scope is evidence of a reference you didn't account for, not of delayed cleanup.",
+    "difficulty": "beginner"
+  },
+  {
+    "id": "q-arc-3",
+    "conceptID": "arc",
+    "categoryID": "memory",
+    "kind": "trueFalse",
+    "prompt": "Structs are reference counted by ARC.",
+    "options": [
+      {
+        "id": "true",
+        "text": "True"
+      },
+      {
+        "id": "false",
+        "text": "False"
+      }
+    ],
+    "correctOptionID": "false",
+    "explanation": "Structs are values, copied rather than shared, so there's nothing to count. But a struct that *contains* a class reference does participate: copying it retains the object inside. That's how `Array` works — the struct is free to copy, the heap buffer it points at is reference counted.",
+    "difficulty": "intermediate"
+  },
+  {
+    "id": "q-weak-vs-unowned-1",
+    "conceptID": "weak-vs-unowned",
+    "categoryID": "memory",
+    "kind": "multipleChoice",
+    "prompt": "Why must a `weak` reference always be a `var` and optional?",
+    "options": [
+      {
+        "id": "a",
+        "text": "Because ARC needs to reassign it to nil when the object deallocates"
+      },
+      {
+        "id": "b",
+        "text": "Because weak references are always to classes"
+      },
+      {
+        "id": "c",
+        "text": "Because the compiler can't infer the type otherwise"
+      },
+      {
+        "id": "d",
+        "text": "It doesn't have to be — `weak let` is legal"
+      }
+    ],
+    "correctOptionID": "a",
+    "explanation": "Zeroing is the defining behaviour of `weak`: when the object dies, the runtime writes nil into every weak reference to it. That requires the reference to be mutable and to have nil in its domain, so `var` and optional are both forced. `unowned` isn't zeroed, which is exactly why `unowned let` is fine.",
+    "difficulty": "beginner"
+  },
+  {
+    "id": "q-weak-vs-unowned-2",
+    "conceptID": "weak-vs-unowned",
+    "categoryID": "memory",
+    "kind": "whatHappensNext",
+    "prompt": "What happens here?",
+    "code": "var owner: Customer? = Customer(name: \"Ada\")\nlet card = CreditCard(number: \"1234\", customer: owner!)\nowner = nil\nprint(card.customer.name)",
+    "options": [
+      {
+        "id": "a",
+        "text": "Prints \"Ada\""
+      },
+      {
+        "id": "b",
+        "text": "Prints nothing"
+      },
+      {
+        "id": "c",
+        "text": "Crashes when `card.customer` is accessed"
+      },
+      {
+        "id": "d",
+        "text": "Doesn't compile"
+      }
+    ],
+    "correctOptionID": "c",
+    "explanation": "The `Customer` was only held by `owner`, so setting it to nil drops the strong count to zero and deallocates it. `card.customer` is `unowned`, so it wasn't zeroed — it still points at the dead object, and reading it traps. Had it been `weak`, you'd get nil and could handle it. This is precisely the invariant violation `unowned` is a bet against.",
+    "difficulty": "advanced"
+  },
+  {
+    "id": "q-weak-vs-unowned-3",
+    "conceptID": "weak-vs-unowned",
+    "categoryID": "memory",
+    "kind": "trueFalse",
+    "prompt": "`unowned` is faster to read than `weak`.",
+    "options": [
+      {
+        "id": "true",
+        "text": "True"
+      },
+      {
+        "id": "false",
+        "text": "False"
+      }
+    ],
+    "correctOptionID": "true",
+    "explanation": "Reading a `weak` reference goes through the side table and retains the result to keep it alive for the duration of the expression. `unowned` is closer to a plain pointer load. It's a real difference, though rarely the one that matters — correctness of the lifetime guarantee should decide, not the nanoseconds.",
+    "difficulty": "advanced"
+  },
+  {
+    "id": "q-retain-cycles-1",
+    "conceptID": "retain-cycles",
+    "categoryID": "memory",
+    "kind": "multipleChoice",
+    "prompt": "Two objects reference each other strongly and every outside reference is dropped. What does ARC do?",
+    "options": [
+      {
+        "id": "a",
+        "text": "Detects the objects are unreachable and frees them"
+      },
+      {
+        "id": "b",
+        "text": "Frees them at the next memory warning"
+      },
+      {
+        "id": "c",
+        "text": "Nothing — both counts remain above zero, so both leak"
+      },
+      {
+        "id": "d",
+        "text": "Raises a runtime warning about the cycle"
+      }
+    ],
+    "correctOptionID": "c",
+    "explanation": "ARC only ever looks at one object's count. It has no notion of reachability, no roots to trace from, and no background pass — those are tracing-GC concepts. Each object here still has one strong reference (from the other), so neither count reaches zero and neither is ever freed. Memory pressure doesn't help; the objects are perfectly valid, just unreachable.",
+    "difficulty": "intermediate"
+  },
+  {
+    "id": "q-retain-cycles-2",
+    "conceptID": "retain-cycles",
+    "categoryID": "memory",
+    "kind": "multipleChoice",
+    "prompt": "Which is the correct fix for a parent-child pair that reference each other?",
+    "options": [
+      {
+        "id": "a",
+        "text": "Make both references weak"
+      },
+      {
+        "id": "b",
+        "text": "Make the child's reference to the parent weak, keeping the parent's reference to the child strong"
+      },
+      {
+        "id": "c",
+        "text": "Make the parent's reference to the child weak, keeping the child's strong"
+      },
+      {
+        "id": "d",
+        "text": "Make both unowned"
+      }
+    ],
+    "correctOptionID": "b",
+    "explanation": "Ownership should point one way, and the parent is the owner — it's what keeps the child alive. Weakening the back-reference breaks the loop without changing who owns what. Option (c) inverts it: the parent would no longer keep the child alive, so the child would be deallocated the moment nothing else held it. Making both weak means nothing keeps either alive.",
+    "difficulty": "intermediate"
+  },
+  {
+    "id": "q-retain-cycles-3",
+    "conceptID": "retain-cycles",
+    "categoryID": "memory",
+    "kind": "trueFalse",
+    "prompt": "A retain cycle always involves exactly two objects.",
+    "options": [
+      {
+        "id": "true",
+        "text": "True"
+      },
+      {
+        "id": "false",
+        "text": "False"
+      }
+    ],
+    "correctOptionID": "false",
+    "explanation": "Any loop will do. A → B → C → A leaks all three, and a single object can cycle with itself by storing a closure that captures it. The closure case is the most common in practice, because the second participant — the closure's context box — isn't a type you declared and so is easy to overlook.",
+    "difficulty": "intermediate"
+  },
+  {
+    "id": "q-closure-capture-1",
+    "conceptID": "closure-capture",
+    "categoryID": "memory",
+    "kind": "whatHappensNext",
+    "prompt": "What does this print?",
+    "code": "var x = 10\nlet show = { [x] in print(x) }\nx = 99\nshow()",
+    "options": [
+      {
+        "id": "a",
+        "text": "10"
+      },
+      {
+        "id": "b",
+        "text": "99"
+      },
+      {
+        "id": "c",
+        "text": "nil"
+      },
+      {
+        "id": "d",
+        "text": "It doesn't compile"
+      }
+    ],
+    "correctOptionID": "a",
+    "explanation": "A capture list is evaluated when the closure is *created*, so `[x]` copies the value 10 at that moment. Reassigning `x` afterwards changes the variable, not the captured copy. Without the capture list the closure would refer to the variable's storage and print 99 — which is the distinction the capture list exists to give you.",
+    "difficulty": "advanced"
+  },
+  {
+    "id": "q-closure-capture-2",
+    "conceptID": "closure-capture",
+    "categoryID": "memory",
+    "kind": "scenario",
+    "prompt": "A network completion handler saves a draft. What's the risk of `[weak self]`?",
+    "options": [
+      {
+        "id": "a",
+        "text": "It creates a retain cycle"
+      },
+      {
+        "id": "b",
+        "text": "If self is deallocated before the response arrives, the draft is silently never saved"
+      },
+      {
+        "id": "c",
+        "text": "It crashes when self is nil"
+      },
+      {
+        "id": "d",
+        "text": "None — weak self is always correct for network callbacks"
+      }
+    ],
+    "correctOptionID": "b",
+    "explanation": "Weak capture means the closure stops keeping the object alive, so if the screen is dismissed mid-flight, `self` is nil when the response lands and the body does nothing. No crash, no log, no saved draft. When work must complete regardless of the UI, capturing strongly — or moving the work to an object that outlives the screen — is the correct choice.",
+    "difficulty": "senior"
+  },
+  {
+    "id": "q-closure-capture-3",
+    "conceptID": "closure-capture",
+    "categoryID": "memory",
+    "kind": "trueFalse",
+    "prompt": "`guard let self else { return }` keeps `self` alive for the rest of the closure body.",
+    "options": [
+      {
+        "id": "true",
+        "text": "True"
+      },
+      {
+        "id": "false",
+        "text": "False"
+      }
+    ],
+    "correctOptionID": "true",
+    "explanation": "It promotes the weak reference to a strong local one, so `self` can't be deallocated partway through. Without it, a sequence of separate `self?.` calls could each see a different answer if another thread releases the last strong reference in between.",
+    "difficulty": "advanced"
+  },
+  {
+    "id": "q-async-await-1",
+    "conceptID": "async-await",
+    "categoryID": "concurrency",
+    "kind": "multipleChoice",
+    "prompt": "What does `await` actually do to the current thread?",
+    "options": [
+      {
+        "id": "a",
+        "text": "Blocks it until the result is ready"
+      },
+      {
+        "id": "b",
+        "text": "Suspends the function and releases the thread to run other work, resuming later — possibly on a different thread"
+      },
+      {
+        "id": "c",
+        "text": "Moves the work to a background thread"
+      },
+      {
+        "id": "d",
+        "text": "Nothing; it's a compile-time annotation only"
+      }
+    ],
+    "correctOptionID": "b",
+    "explanation": "Suspension is the whole point. The function's state is saved to a heap frame and the thread returns to the cooperative pool, so a handful of threads can serve thousands of in-flight async operations. Because the thread is released, resumption can happen on a different one — which is why you can't assume thread-local state survives an await.",
+    "difficulty": "intermediate"
+  },
+  {
+    "id": "q-async-await-2",
+    "conceptID": "async-await",
+    "categoryID": "concurrency",
+    "kind": "scenario",
+    "prompt": "How long does this take, roughly?",
+    "code": "// each takes ~1 second\nlet a = await first()\nlet b = await second()",
+    "options": [
+      {
+        "id": "a",
+        "text": "1 second"
+      },
+      {
+        "id": "b",
+        "text": "2 seconds"
+      },
+      {
+        "id": "c",
+        "text": "Instant"
+      },
+      {
+        "id": "d",
+        "text": "Depends on the core count"
+      }
+    ],
+    "correctOptionID": "b",
+    "explanation": "The two awaits are sequential: `second()` doesn't start until `first()` has returned. Since they don't depend on each other, `async let a = first()` / `async let b = second()` would start both immediately and finish in about one second. This is the most common performance mistake in adopting async/await, precisely because the slow version looks perfectly clean.",
+    "difficulty": "intermediate"
+  },
+  {
+    "id": "q-async-await-3",
+    "conceptID": "async-await",
+    "categoryID": "concurrency",
+    "kind": "trueFalse",
+    "prompt": "It's fine to call `Thread.sleep` inside an async function to wait a bit.",
+    "options": [
+      {
+        "id": "true",
+        "text": "True"
+      },
+      {
+        "id": "false",
+        "text": "False"
+      }
+    ],
+    "correctOptionID": "false",
+    "explanation": "`Thread.sleep` blocks the underlying thread, and the cooperative pool only has about one thread per core. Blocking one starves a core; blocking several can deadlock the pool. `try await Task.sleep(for: .seconds(1))` suspends instead, giving the thread back, and it responds to cancellation.",
+    "difficulty": "advanced"
+  },
+  {
+    "id": "q-actors-1",
+    "conceptID": "actors",
+    "categoryID": "concurrency",
+    "kind": "multipleChoice",
+    "prompt": "Why does calling an actor method from outside require `await`?",
+    "options": [
+      {
+        "id": "a",
+        "text": "Because actor methods always run on a background thread"
+      },
+      {
+        "id": "b",
+        "text": "Because the call may need to wait for the actor to become free, and waiting suspends rather than blocks"
+      },
+      {
+        "id": "c",
+        "text": "Because actors are reference types"
+      },
+      {
+        "id": "d",
+        "text": "Because all actor methods are implicitly async"
+      }
+    ],
+    "correctOptionID": "b",
+    "explanation": "The actor may already be executing another call. Rather than blocking the caller's thread, the call suspends until the actor is free. It's not about which thread the code runs on — a `@MainActor` method runs on the main thread and still needs `await` from outside. And the methods aren't implicitly async: from *inside* the actor they're called synchronously with no await at all.",
+    "difficulty": "advanced"
+  },
+  {
+    "id": "q-actors-2",
+    "conceptID": "actors",
+    "categoryID": "concurrency",
+    "kind": "scenario",
+    "prompt": "Two tasks call this concurrently for the same key. What can happen?",
+    "code": "actor Cache {\n    var store: [String: Int] = [:]\n    func value(_ key: String) async -> Int {\n        if let v = store[key] { return v }\n        let v = await fetch(key)\n        store[key] = v\n        return v\n    }\n}",
+    "options": [
+      {
+        "id": "a",
+        "text": "Nothing unusual — the actor serialises the whole method"
+      },
+      {
+        "id": "b",
+        "text": "Both can pass the cache check before either assigns, so the value is fetched twice"
+      },
+      {
+        "id": "c",
+        "text": "A data race on the cache dictionary"
+      },
+      {
+        "id": "d",
+        "text": "A deadlock"
+      }
+    ],
+    "correctOptionID": "b",
+    "explanation": "Actors are reentrant. The `await fetch()` suspends, and the actor is then free to start the second call — which finds the cache still empty and fetches too. There's no data race, because the dictionary itself is still protected, and no deadlock, because suspension isn't blocking. It's a logical race across a suspension point, and the fix is to store the in-flight `Task` so the second caller awaits the first one's result.",
+    "difficulty": "senior"
+  },
+  {
+    "id": "q-actors-3",
+    "conceptID": "actors",
+    "categoryID": "concurrency",
+    "kind": "trueFalse",
+    "prompt": "`nonisolated` members of an actor can be accessed without `await`.",
+    "options": [
+      {
+        "id": "true",
+        "text": "True"
+      },
+      {
+        "id": "false",
+        "text": "False"
+      }
+    ],
+    "correctOptionID": "true",
+    "explanation": "`nonisolated` says the member doesn't touch isolated mutable state, so there's nothing to protect and no need to wait. It's how you expose an immutable `id` or conform to a synchronous protocol requirement like `Hashable` — the compiler checks that the body really doesn't touch isolated state.",
+    "difficulty": "advanced"
+  },
+  {
+    "id": "q-main-actor-1",
+    "conceptID": "main-actor",
+    "categoryID": "concurrency",
+    "kind": "multipleChoice",
+    "prompt": "Why can code running on `@MainActor` still cause the UI to freeze?",
+    "options": [
+      {
+        "id": "a",
+        "text": "It can't — MainActor code is always fast"
+      },
+      {
+        "id": "b",
+        "text": "Because @MainActor means the code runs on the main thread, so any slow synchronous work there blocks rendering and touch handling"
+      },
+      {
+        "id": "c",
+        "text": "Because MainActor uses a background thread that competes with the main one"
+      },
+      {
+        "id": "d",
+        "text": "Only if you also use DispatchQueue.main.sync"
+      }
+    ],
+    "correctOptionID": "b",
+    "explanation": "`@MainActor` is about *isolation*, not speed. Its executor is the main thread — the same thread that runs the run loop, handles touches, and commits frames. Slow synchronous work there blocks all of it. Adding `await` doesn't help if the awaited work is also main-actor isolated; the work has to actually move to a non-isolated type.",
+    "difficulty": "intermediate"
+  },
+  {
+    "id": "q-main-actor-2",
+    "conceptID": "main-actor",
+    "categoryID": "concurrency",
+    "kind": "scenario",
+    "prompt": "A main-actor function awaits a non-isolated async function in a loop of 1,000 iterations. What's the hidden cost?",
+    "options": [
+      {
+        "id": "a",
+        "text": "Nothing measurable"
+      },
+      {
+        "id": "b",
+        "text": "1,000 hops back onto the main actor, each enqueueing on the main queue and waiting its turn"
+      },
+      {
+        "id": "c",
+        "text": "The loop runs on a background thread"
+      },
+      {
+        "id": "d",
+        "text": "The compiler rejects it"
+      }
+    ],
+    "correctOptionID": "b",
+    "explanation": "Each resumption after an `await` has to get back onto the main actor, which means enqueueing on the main queue and waiting to be scheduled. A thousand round trips is real time, and it's invisible in the source. Doing the whole loop inside one non-isolated function and returning the finished result costs a single hop.",
+    "difficulty": "senior"
+  },
+  {
+    "id": "q-main-actor-3",
+    "conceptID": "main-actor",
+    "categoryID": "concurrency",
+    "kind": "trueFalse",
+    "prompt": "`@MainActor` and \"the main thread\" are exactly the same thing.",
+    "options": [
+      {
+        "id": "true",
+        "text": "True"
+      },
+      {
+        "id": "false",
+        "text": "False"
+      }
+    ],
+    "correctOptionID": "false",
+    "explanation": "Close, but the distinction matters. `MainActor` is an isolation domain; the main thread is where its executor happens to run. Code can be on the main thread without being main-actor isolated — a synchronous callback from an old C API, say — which is why `MainActor.assumeIsolated` exists to bridge the two.",
+    "difficulty": "advanced"
+  },
+  {
+    "id": "q-sendable-1",
+    "conceptID": "sendable",
+    "categoryID": "concurrency",
+    "kind": "multipleChoice",
+    "prompt": "Which of these is NOT automatically `Sendable`?",
+    "options": [
+      {
+        "id": "a",
+        "text": "A struct whose stored properties are all Sendable"
+      },
+      {
+        "id": "b",
+        "text": "An actor"
+      },
+      {
+        "id": "c",
+        "text": "A final class with only immutable Sendable stored properties"
+      },
+      {
+        "id": "d",
+        "text": "A final class with a mutable var property"
+      }
+    ],
+    "correctOptionID": "d",
+    "explanation": "Mutable state in a class is shared by reference, which is exactly the shape a data race needs, so the compiler won't infer `Sendable`. Structs of Sendable parts get it automatically, actors always have it because their state is isolated, and an immutable final class is safe because nothing can change. To make (d) safe you'd protect the state with a lock and declare `@unchecked Sendable`, or make it an actor.",
+    "difficulty": "advanced"
+  },
+  {
+    "id": "q-sendable-2",
+    "conceptID": "sendable",
+    "categoryID": "concurrency",
+    "kind": "multipleChoice",
+    "prompt": "What does `@unchecked Sendable` actually do?",
+    "options": [
+      {
+        "id": "a",
+        "text": "Makes the type thread-safe automatically"
+      },
+      {
+        "id": "b",
+        "text": "Adds a runtime lock around the type's properties"
+      },
+      {
+        "id": "c",
+        "text": "Turns off the compiler's safety check and moves the guarantee onto you"
+      },
+      {
+        "id": "d",
+        "text": "Marks the type as unsafe to share"
+      }
+    ],
+    "correctOptionID": "c",
+    "explanation": "It's an assertion, not a mechanism. Nothing is added at runtime — you're telling the compiler you've established safety by means it can't verify, typically a lock or a private serial queue. If that's not actually true, you've documented a race rather than fixed one.",
+    "difficulty": "advanced"
+  },
+  {
+    "id": "q-sendable-3",
+    "conceptID": "sendable",
+    "categoryID": "concurrency",
+    "kind": "trueFalse",
+    "prompt": "A data race and a race condition are the same thing.",
+    "options": [
+      {
+        "id": "true",
+        "text": "True"
+      },
+      {
+        "id": "false",
+        "text": "False"
+      }
+    ],
+    "correctOptionID": "false",
+    "explanation": "A data race is the specific low-level case of unsynchronised concurrent access with at least one write — that's what `Sendable` and actors eliminate. A race condition is the broader logical problem of behaviour depending on timing, and it survives perfectly well in fully data-race-free code: the double-fetch across an actor's `await` is a race condition with no data race in sight.",
+    "difficulty": "senior"
+  },
+  {
+    "id": "q-vc-lifecycle-1",
+    "conceptID": "vc-lifecycle",
+    "categoryID": "uikit",
+    "kind": "scenario",
+    "prompt": "You push a detail screen from a list, then tap back. Which callbacks run on the list controller?",
+    "options": [
+      {
+        "id": "a",
+        "text": "viewDidLoad, then viewWillAppear and viewDidAppear"
+      },
+      {
+        "id": "b",
+        "text": "viewWillAppear and viewDidAppear only"
+      },
+      {
+        "id": "c",
+        "text": "Only viewDidAppear"
+      },
+      {
+        "id": "d",
+        "text": "None; it was never removed from the hierarchy"
+      }
+    ],
+    "correctOptionID": "b",
+    "explanation": "The list controller was never deallocated — the navigation controller kept it in its stack — so it isn't reloaded and `viewDidLoad` doesn't run again. Only the appearance pair fires. This is exactly why refresh logic belongs in `viewWillAppear`: put it in `viewDidLoad` and returning from the detail screen shows stale data.",
+    "difficulty": "beginner"
+  },
+  {
+    "id": "q-vc-lifecycle-2",
+    "conceptID": "vc-lifecycle",
+    "categoryID": "uikit",
+    "kind": "multipleChoice",
+    "prompt": "Where should you set a layer's frame to match a view's bounds?",
+    "options": [
+      {
+        "id": "a",
+        "text": "viewDidLoad"
+      },
+      {
+        "id": "b",
+        "text": "viewWillAppear"
+      },
+      {
+        "id": "c",
+        "text": "viewDidLayoutSubviews"
+      },
+      {
+        "id": "d",
+        "text": "init"
+      }
+    ],
+    "correctOptionID": "c",
+    "explanation": "Layers don't participate in Auto Layout, so their frames must be set manually once the real bounds are known. At `viewDidLoad` and even `viewWillAppear` the bounds may not be final. `viewDidLayoutSubviews` runs after layout resolves and re-runs on every bounds change, so the layer stays correct through rotation and resizing.",
+    "difficulty": "intermediate"
+  },
+  {
+    "id": "q-vc-lifecycle-3",
+    "conceptID": "vc-lifecycle",
+    "categoryID": "uikit",
+    "kind": "trueFalse",
+    "prompt": "Accessing `viewController.view` from outside can trigger `viewDidLoad`.",
+    "options": [
+      {
+        "id": "true",
+        "text": "True"
+      },
+      {
+        "id": "false",
+        "text": "False"
+      }
+    ],
+    "correctOptionID": "true",
+    "explanation": "`view` is lazy — the first access calls `loadView` and then `viewDidLoad`. So configuring a controller by touching its view before presenting it loads it there and then, which is a genuinely surprising source of ordering bugs.",
+    "difficulty": "advanced"
+  },
+  {
+    "id": "q-responder-chain-1",
+    "conceptID": "responder-chain",
+    "categoryID": "uikit",
+    "kind": "scenario",
+    "prompt": "A button sits partly outside its superview's bounds. The superview doesn't clip, so the button is visible. What happens when you tap the outside part?",
+    "options": [
+      {
+        "id": "a",
+        "text": "It works normally"
+      },
+      {
+        "id": "b",
+        "text": "Nothing — hit testing stops at the superview, which reports the point isn't inside it"
+      },
+      {
+        "id": "c",
+        "text": "The tap goes to the view behind"
+      },
+      {
+        "id": "d",
+        "text": "It crashes"
+      }
+    ],
+    "correctOptionID": "b",
+    "explanation": "`hitTest` asks the superview `point(inside:with:)` before recursing into its subviews. The point is outside the superview's bounds, so it returns nil and never considers the button — regardless of the fact that the button is drawn there, because drawing and hit testing are separate passes. Overriding `point(inside:with:)` on the superview to include the button's frame is the standard fix.",
+    "difficulty": "advanced"
+  },
+  {
+    "id": "q-responder-chain-2",
+    "conceptID": "responder-chain",
+    "categoryID": "uikit",
+    "kind": "multipleChoice",
+    "prompt": "What does passing `nil` as the target of `sendAction` mean?",
+    "options": [
+      {
+        "id": "a",
+        "text": "The action is ignored"
+      },
+      {
+        "id": "b",
+        "text": "The action is sent to the app delegate directly"
+      },
+      {
+        "id": "c",
+        "text": "UIKit walks the responder chain from the first responder until it finds an object implementing the action"
+      },
+      {
+        "id": "d",
+        "text": "The action is sent to every responder in the chain"
+      }
+    ],
+    "correctOptionID": "c",
+    "explanation": "That's the whole point of a nil target: the sender doesn't need to know who will handle it. UIKit starts at the first responder and walks up until something implements the selector, then stops — only one object handles it, not all of them. It's how the system edit menu reaches whichever field is focused.",
+    "difficulty": "intermediate"
+  },
+  {
+    "id": "q-responder-chain-3",
+    "conceptID": "responder-chain",
+    "categoryID": "uikit",
+    "kind": "trueFalse",
+    "prompt": "A view with `alpha = 0` can still receive touches.",
+    "options": [
+      {
+        "id": "true",
+        "text": "True"
+      },
+      {
+        "id": "false",
+        "text": "False"
+      }
+    ],
+    "correctOptionID": "false",
+    "explanation": "Hit testing skips views with `alpha <= 0.01`, along with hidden views and those with user interaction disabled. If you want something invisible but tappable, use a clear background colour rather than zero alpha.",
+    "difficulty": "intermediate"
+  },
+  {
+    "id": "q-state-1",
+    "conceptID": "state",
+    "categoryID": "swiftui",
+    "kind": "multipleChoice",
+    "prompt": "Why can a `@State` property be mutated inside a `body` closure when the view is a struct?",
+    "options": [
+      {
+        "id": "a",
+        "text": "SwiftUI views are secretly classes"
+      },
+      {
+        "id": "b",
+        "text": "@State stores the value in framework-managed storage and holds a reference to it, so the struct itself isn't mutated"
+      },
+      {
+        "id": "c",
+        "text": "Because body is a mutating function"
+      },
+      {
+        "id": "d",
+        "text": "Because the compiler makes an exception for property wrappers"
+      }
+    ],
+    "correctOptionID": "b",
+    "explanation": "The wrapper holds a reference to a box SwiftUI owns. Writing goes through that reference into the box, so the struct is unchanged and no `mutating` is needed. It's also why the value outlives the struct: the box is keyed by view identity, not by the struct instance.",
+    "difficulty": "intermediate"
+  },
+  {
+    "id": "q-state-2",
+    "conceptID": "state",
+    "categoryID": "swiftui",
+    "kind": "scenario",
+    "prompt": "A child view has `@State private var text` initialised from an `init` parameter. The parent re-renders with a new value. What does the child show?",
+    "options": [
+      {
+        "id": "a",
+        "text": "The new value"
+      },
+      {
+        "id": "b",
+        "text": "The original value it was first created with"
+      },
+      {
+        "id": "c",
+        "text": "An empty string"
+      },
+      {
+        "id": "d",
+        "text": "It crashes"
+      }
+    ],
+    "correctOptionID": "b",
+    "explanation": "The initial value is only consulted when the storage is first created. On subsequent recreations SwiftUI reuses the existing storage and ignores the parameter entirely. If the parent owns the value, pass a `Binding`; if the child should genuinely reset, give it `.id(newValue)` so it gets a new identity and fresh state.",
+    "difficulty": "advanced"
+  },
+  {
+    "id": "q-state-3",
+    "conceptID": "state",
+    "categoryID": "swiftui",
+    "kind": "trueFalse",
+    "prompt": "Adding `.id(someValue)` to a view resets its `@State` when that value changes.",
+    "options": [
+      {
+        "id": "true",
+        "text": "True"
+      },
+      {
+        "id": "false",
+        "text": "False"
+      }
+    ],
+    "correctOptionID": "true",
+    "explanation": "State storage is keyed by view identity, and `.id()` sets it explicitly. A new id means a new view as far as SwiftUI is concerned, so fresh storage. It's the deliberate version of the accidental resets people hit when moving views between branches of an `if`.",
+    "difficulty": "advanced"
+  },
+  {
+    "id": "q-binding-1",
+    "conceptID": "binding",
+    "categoryID": "swiftui",
+    "kind": "multipleChoice",
+    "prompt": "What does the `$` prefix actually give you?",
+    "options": [
+      {
+        "id": "a",
+        "text": "A copy of the value"
+      },
+      {
+        "id": "b",
+        "text": "The property wrapper's projected value — for @State, a Binding to its storage"
+      },
+      {
+        "id": "c",
+        "text": "A reference to the view"
+      },
+      {
+        "id": "d",
+        "text": "An optional version of the value"
+      }
+    ],
+    "correctOptionID": "b",
+    "explanation": "`$count` is sugar for `_count.projectedValue`. For `@State` and `@Binding` that projection is a `Binding`, which is a getter/setter pair pointing at the underlying storage. Other wrappers project other things — the `$` is a general property-wrapper feature, not binding-specific syntax.",
+    "difficulty": "beginner"
+  },
+  {
+    "id": "q-binding-2",
+    "conceptID": "binding",
+    "categoryID": "swiftui",
+    "kind": "scenario",
+    "prompt": "A child view takes `let isOn: Bool` and shows a Toggle bound to it via a local @State. The user flips it. What does the parent see?",
+    "options": [
+      {
+        "id": "a",
+        "text": "The new value"
+      },
+      {
+        "id": "b",
+        "text": "Nothing — the child mutated its own copy, and the parent's value is untouched"
+      },
+      {
+        "id": "c",
+        "text": "A crash"
+      },
+      {
+        "id": "d",
+        "text": "The parent updates after the next render"
+      }
+    ],
+    "correctOptionID": "b",
+    "explanation": "A plain `let` is a one-way snapshot, and the child's `@State` is separate storage initialised from it once. The toggle updates the child's copy and the parent never hears about it. This is the archetypal SwiftUI data-flow bug, and it's hard to spot because the control looks like it's working. `@Binding` plus `$` is the fix.",
+    "difficulty": "intermediate"
+  },
+  {
+    "id": "q-binding-3",
+    "conceptID": "binding",
+    "categoryID": "swiftui",
+    "kind": "trueFalse",
+    "prompt": "You can construct a `Binding` by hand with custom get and set closures.",
+    "options": [
+      {
+        "id": "true",
+        "text": "True"
+      },
+      {
+        "id": "false",
+        "text": "False"
+      }
+    ],
+    "correctOptionID": "true",
+    "explanation": "`Binding(get:set:)` is public, and it's how you derive a transformed binding, bridge to a model SwiftUI doesn't know about, or unwrap an optional. `.constant(_)` is the same thing with a setter that throws the value away — handy in previews.",
+    "difficulty": "intermediate"
+  },
+  {
+    "id": "q-observation-1",
+    "conceptID": "observation",
+    "categoryID": "swiftui",
+    "kind": "multipleChoice",
+    "prompt": "What's the main advantage of `@Observable` over `ObservableObject` with `@Published`?",
+    "options": [
+      {
+        "id": "a",
+        "text": "It works with structs as well as classes"
+      },
+      {
+        "id": "b",
+        "text": "Dependencies are tracked per property, so a view only re-renders when a property it actually read changes"
+      },
+      {
+        "id": "c",
+        "text": "It removes the need for @State anywhere"
+      },
+      {
+        "id": "d",
+        "text": "It makes the model thread-safe"
+      }
+    ],
+    "correctOptionID": "b",
+    "explanation": "`ObservableObject` fires one `objectWillChange` for any mutation, so every observing view re-renders regardless of what it read. Observation records the specific properties accessed during body evaluation and notifies only those views. It's still classes only, it doesn't touch thread safety, and you still use `@State` to own a model's lifetime.",
+    "difficulty": "intermediate"
+  },
+  {
+    "id": "q-observation-2",
+    "conceptID": "observation",
+    "categoryID": "swiftui",
+    "kind": "scenario",
+    "prompt": "A view's body reads `model.name`. Something mutates `model.progress`. What happens?",
+    "options": [
+      {
+        "id": "a",
+        "text": "The view re-renders"
+      },
+      {
+        "id": "b",
+        "text": "The view does not re-render"
+      },
+      {
+        "id": "c",
+        "text": "The view re-renders only if progress is @Published"
+      },
+      {
+        "id": "d",
+        "text": "The whole hierarchy re-renders"
+      }
+    ],
+    "correctOptionID": "b",
+    "explanation": "Only the properties actually accessed during body evaluation are registered as dependencies for that view. `progress` wasn't read, so mutating it doesn't invalidate this view. Under `ObservableObject` the same code *would* re-render, because `objectWillChange` doesn't distinguish between properties.",
+    "difficulty": "advanced"
+  },
+  {
+    "id": "q-observation-3",
+    "conceptID": "observation",
+    "categoryID": "swiftui",
+    "kind": "trueFalse",
+    "prompt": "Reading an @Observable property inside a Button's action closure creates a dependency.",
+    "options": [
+      {
+        "id": "true",
+        "text": "True"
+      },
+      {
+        "id": "false",
+        "text": "False"
+      }
+    ],
+    "correctOptionID": "false",
+    "explanation": "Tracking records accesses that happen *during body evaluation*. An action closure runs later, in response to a tap, so reads inside it aren't tracked. That's usually what you want — you don't want a view re-rendering because its button handler happened to read something.",
+    "difficulty": "senior"
+  }
+]

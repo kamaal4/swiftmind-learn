@@ -1,0 +1,42 @@
+[
+  {
+    "id": "swift",
+    "name": "Swift",
+    "summary": "The language itself — types, optionals, closures and protocols.",
+    "systemImage": "swift",
+    "accentHex": "F05138",
+    "order": 1
+  },
+  {
+    "id": "memory",
+    "name": "Memory Management",
+    "summary": "ARC, ownership, and the cycles that leak when ownership is unclear.",
+    "systemImage": "memorychip",
+    "accentHex": "5E5CE6",
+    "order": 2
+  },
+  {
+    "id": "concurrency",
+    "name": "Concurrency",
+    "summary": "async/await, actors, and the type system that makes data races a compile error.",
+    "systemImage": "arrow.triangle.branch",
+    "accentHex": "0A84FF",
+    "order": 3
+  },
+  {
+    "id": "uikit",
+    "name": "UIKit",
+    "summary": "View controllers, events, and the framework SwiftUI still sits on top of.",
+    "systemImage": "square.stack.3d.up",
+    "accentHex": "FF9F0A",
+    "order": 4
+  },
+  {
+    "id": "swiftui",
+    "name": "SwiftUI",
+    "summary": "Declarative views, state ownership, and how the framework decides what to redraw.",
+    "systemImage": "rectangle.3.group",
+    "accentHex": "30D158",
+    "order": 5
+  }
+]

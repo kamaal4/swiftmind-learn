@@ -1,0 +1,240 @@
+[
+  {
+    "id": "t-optionals-1",
+    "conceptID": "optionals",
+    "categoryID": "swift",
+    "text": "`Optional` is just an enum you could have written yourself.",
+    "detail": "`enum Optional<Wrapped> { case none; case some(Wrapped) }` — `nil` is literally `.none`, and `String?` is sugar for `Optional<String>`. You can pattern-match one in a `switch` like any other enum."
+  },
+  {
+    "id": "t-optionals-2",
+    "conceptID": "optionals",
+    "categoryID": "swift",
+    "text": "`??` short-circuits like `||` does.",
+    "detail": "The right-hand side of nil-coalescing is `@autoclosure`, so `expensive()` in `value ?? expensive()` only runs when `value` is actually nil."
+  },
+  {
+    "id": "t-closures-1",
+    "conceptID": "closures",
+    "categoryID": "swift",
+    "text": "Functions and closures are the same thing to the compiler.",
+    "detail": "You can pass a named function anywhere a closure is expected — `items.map(String.init)` works because a function reference *is* a closure value, just one with no captures."
+  },
+  {
+    "id": "t-closures-2",
+    "conceptID": "closures",
+    "categoryID": "swift",
+    "text": "`{ $0 * 2 }` has no `return` because of implicit return.",
+    "detail": "A closure whose body is a single expression returns it automatically. Swift 5.1 extended the same rule to functions and computed properties."
+  },
+  {
+    "id": "t-struct-vs-class-1",
+    "conceptID": "struct-vs-class",
+    "categoryID": "swift",
+    "text": "`Array`, `String`, `Dictionary` and `Set` are all structs.",
+    "detail": "They achieve value semantics without copying their contents eagerly, using copy-on-write over a shared heap buffer."
+  },
+  {
+    "id": "t-struct-vs-class-2",
+    "conceptID": "struct-vs-class",
+    "categoryID": "swift",
+    "text": "SwiftUI's `View` is a protocol on structs, deliberately.",
+    "detail": "Views are cheap values that get created and thrown away constantly. If they were classes, every diff would mean heap allocation and reference counting."
+  },
+  {
+    "id": "t-protocols-1",
+    "conceptID": "protocols",
+    "categoryID": "swift",
+    "text": "`Collection` declares a handful of requirements and gives you dozens of methods.",
+    "detail": "`map`, `filter`, `first(where:)`, `sorted` and the rest are all protocol extension defaults written once against `startIndex`, `endIndex` and `subscript`."
+  },
+  {
+    "id": "t-protocols-2",
+    "conceptID": "protocols",
+    "categoryID": "swift",
+    "text": "You can conform a type you don't own to a protocol you don't own.",
+    "detail": "Swift 6 wants the `@retroactive` attribute when you do, because if the owning module later adds the same conformance, which one wins is undefined."
+  },
+  {
+    "id": "t-arc-1",
+    "conceptID": "arc",
+    "categoryID": "memory",
+    "text": "ARC is a compile-time feature, not a runtime one.",
+    "detail": "The compiler inserts retain/release calls while compiling. There's no background thread and no collection pause — which is why deallocation timing is predictable enough to rely on in `deinit`."
+  },
+  {
+    "id": "t-arc-2",
+    "conceptID": "arc",
+    "categoryID": "memory",
+    "text": "`weak` references are stored in a side table, not in the object.",
+    "detail": "That's how every weak reference to an object can be zeroed the moment it dies, and also why reading a weak reference costs more than reading a strong one."
+  },
+  {
+    "id": "t-weak-vs-unowned-1",
+    "conceptID": "weak-vs-unowned",
+    "categoryID": "memory",
+    "text": "An object with unowned references pointing at it becomes a zombie, not free memory.",
+    "detail": "After deinit runs, the allocation is held back while the unowned count is above zero, so accessing it traps predictably rather than reading whatever was allocated in its place."
+  },
+  {
+    "id": "t-weak-vs-unowned-2",
+    "conceptID": "weak-vs-unowned",
+    "categoryID": "memory",
+    "text": "`unowned(unsafe)` exists and does exactly what it sounds like.",
+    "detail": "No zeroing, no unowned count, no trap — just a dangling pointer and undefined behaviour. It's for interop and hot paths, and it's the one variant worth being genuinely nervous about."
+  },
+  {
+    "id": "t-retain-cycles-1",
+    "conceptID": "retain-cycles",
+    "categoryID": "memory",
+    "text": "Xcode's memory graph debugger draws cycles for you.",
+    "detail": "Pause the app, hit the memory graph button, and filter to your types — a cycle shows as a literal loop in the graph, with the offending references labelled."
+  },
+  {
+    "id": "t-retain-cycles-2",
+    "conceptID": "retain-cycles",
+    "categoryID": "memory",
+    "text": "The `weak var delegate` convention exists entirely because of retain cycles.",
+    "detail": "A delegate is nearly always the delegating object's owner, so a strong delegate property would create a cycle in essentially every use."
+  },
+  {
+    "id": "t-closure-capture-1",
+    "conceptID": "closure-capture",
+    "categoryID": "memory",
+    "text": "`[x]` in a capture list snapshots the value at closure creation.",
+    "detail": "It isn't only for `weak` and `unowned` — capturing a plain value freezes it, which is often exactly what you wanted and sidesteps lifetime questions entirely."
+  },
+  {
+    "id": "t-closure-capture-2",
+    "conceptID": "closure-capture",
+    "categoryID": "memory",
+    "text": "Swift 5.8 let you write `guard let self` without `= self`.",
+    "detail": "Shadowing `self` was specifically allowed because the `guard let strongSelf = self` dance was so ubiquitous it warranted its own syntax."
+  },
+  {
+    "id": "t-async-await-1",
+    "conceptID": "async-await",
+    "categoryID": "concurrency",
+    "text": "The cooperative thread pool is capped at roughly the core count.",
+    "detail": "That's a deliberate contrast with GCD, where every blocked queue could spawn another thread and a busy app could end up with hundreds."
+  },
+  {
+    "id": "t-async-await-2",
+    "conceptID": "async-await",
+    "categoryID": "concurrency",
+    "text": "`await` is the only place a function can suspend.",
+    "detail": "Between two awaits your code runs uninterrupted within its isolation domain, which is what makes actor reasoning tractable — you only have to think about state changing at the awaits."
+  },
+  {
+    "id": "t-actors-1",
+    "conceptID": "actors",
+    "categoryID": "concurrency",
+    "text": "Actor reentrancy exists to prevent deadlock.",
+    "detail": "If an actor stayed locked across an await, an actor awaiting something that eventually calls back into it would wait on itself forever."
+  },
+  {
+    "id": "t-actors-2",
+    "conceptID": "actors",
+    "categoryID": "concurrency",
+    "text": "`actor` is a reference type, like `class`.",
+    "detail": "It gets identity and reference semantics — but no inheritance from other actors, and its isolated state can't be reached without going through the actor."
+  },
+  {
+    "id": "t-main-actor-1",
+    "conceptID": "main-actor",
+    "categoryID": "concurrency",
+    "text": "You can write your own global actor.",
+    "detail": "`@globalActor actor DatabaseActor { static let shared = DatabaseActor() }` gives you a `@DatabaseActor` attribute that serialises everything marked with it, exactly like `@MainActor` does for the UI."
+  },
+  {
+    "id": "t-main-actor-2",
+    "conceptID": "main-actor",
+    "categoryID": "concurrency",
+    "text": "This project sets SWIFT_DEFAULT_ACTOR_ISOLATION to MainActor.",
+    "detail": "So types are main-actor isolated by default and you opt out with `nonisolated` — the right default for an app that's mostly interface, and the reverse of what a library would want."
+  },
+  {
+    "id": "t-sendable-1",
+    "conceptID": "sendable",
+    "categoryID": "concurrency",
+    "text": "`Sendable` is a marker protocol with no requirements at all.",
+    "detail": "It emits no runtime metadata — conformance exists purely so the compiler can check what crosses an isolation boundary."
+  },
+  {
+    "id": "t-sendable-2",
+    "conceptID": "sendable",
+    "categoryID": "concurrency",
+    "text": "Swift 6 turns Sendable violations from warnings into errors.",
+    "detail": "Swift 5 mode with strict concurrency checking is the migration path: fix the warnings module by module, then flip the language mode."
+  },
+  {
+    "id": "t-vc-lifecycle-1",
+    "conceptID": "vc-lifecycle",
+    "categoryID": "uikit",
+    "text": "`loadView` is the one method you override to replace the view entirely.",
+    "detail": "Override it and don't call `super` if you're building the root view in code — but never call it yourself; touching `view` does it for you."
+  },
+  {
+    "id": "t-vc-lifecycle-2",
+    "conceptID": "vc-lifecycle",
+    "categoryID": "uikit",
+    "text": "`viewDidLayoutSubviews` can run many times for a single appearance.",
+    "detail": "Rotation, keyboard, split view, dynamic type and a parent's own layout can each trigger it, so it must stay cheap."
+  },
+  {
+    "id": "t-responder-chain-1",
+    "conceptID": "responder-chain",
+    "categoryID": "uikit",
+    "text": "The keyboard-dismissing one-liner is pure responder chain.",
+    "detail": "`sendAction(#selector(UIResponder.resignFirstResponder), to: nil, ...)` means \"whoever is first responder, stand down\" — no reference to any text field needed."
+  },
+  {
+    "id": "t-responder-chain-2",
+    "conceptID": "responder-chain",
+    "categoryID": "uikit",
+    "text": "A presented view controller's next responder is the presenting one.",
+    "detail": "The chain follows presentation and containment relationships, not just the view hierarchy, so it can jump between windows' worth of views."
+  },
+  {
+    "id": "t-state-1",
+    "conceptID": "state",
+    "categoryID": "swiftui",
+    "text": "SwiftUI recreates view structs constantly, and that's the design.",
+    "detail": "They're cheap values with no heap allocation. The expensive part — the actual render tree — is kept by the framework and diffed against the new description."
+  },
+  {
+    "id": "t-state-2",
+    "conceptID": "state",
+    "categoryID": "swiftui",
+    "text": "`@State` should almost always be `private`.",
+    "detail": "It's storage this view owns. If another view needs to write it, that's a `Binding`, and if the parent should own it, it belongs in the parent."
+  },
+  {
+    "id": "t-binding-1",
+    "conceptID": "binding",
+    "categoryID": "swiftui",
+    "text": "`Binding` stores no data — it's two closures.",
+    "detail": "A getter and a setter pointing at storage owned elsewhere, which is why you can build one by hand and why it's cheap to pass around."
+  },
+  {
+    "id": "t-binding-2",
+    "conceptID": "binding",
+    "categoryID": "swiftui",
+    "text": "`.constant(true)` exists mostly for previews and tests.",
+    "detail": "It's a binding whose setter discards writes, so you can render a view that demands a binding without wiring up real state."
+  },
+  {
+    "id": "t-observation-1",
+    "conceptID": "observation",
+    "categoryID": "swiftui",
+    "text": "The Observation framework isn't SwiftUI-only.",
+    "detail": "`withObservationTracking(_:onChange:)` lives in the standard Observation module and works in plain Swift, including on the server."
+  },
+  {
+    "id": "t-observation-2",
+    "conceptID": "observation",
+    "categoryID": "swiftui",
+    "text": "`@Observable` rewrites your stored properties into computed ones.",
+    "detail": "Each read calls `access(keyPath:)` and each write `withMutation(keyPath:)` against a registrar. Expanding the macro in Xcode shows exactly what it generated."
+  }
+]

@@ -1,0 +1,583 @@
+[
+  {
+    "id": "optionals",
+    "title": "Optionals",
+    "subtitle": "Swift's way of making \"there might be nothing here\" a fact the compiler checks.",
+    "categoryID": "swift",
+    "difficulty": "beginner",
+    "estimatedMinutes": 7,
+    "tags": [
+      "optional",
+      "nil",
+      "unwrapping",
+      "safety"
+    ],
+    "sections": [
+      {
+        "type": "explanation",
+        "body": "An optional is a box that either holds a value or holds nothing. `String` always has a string in it. `String?` might have a string, or might be `nil`.\n\nThis sounds small, and it changes everything. In a language without optionals, any object reference might secretly be null, and you find out at runtime when it crashes. In Swift, a type that can be absent *says so in its name*, and the compiler refuses to let you use the value until you've handled the empty case.\n\nSo `nil` doesn't disappear. It becomes visible, and the compiler starts helping you.",
+        "id": "optionals-s1"
+      },
+      {
+        "type": "analogy",
+        "body": "Think of a PO box.\n\nA `String` is a letter handed to you directly — it's in your hand, it exists.\n\nA `String?` is a PO box. There might be a letter inside, or the box might be empty. You can't read the letter without opening the box first, and you can't assume something's in there just because you were given a key.\n\nUnwrapping is opening the box. Force-unwrapping with `!` is opening it while *promising* there's a letter inside — and if you're wrong, the program stops.",
+        "id": "optionals-s2"
+      },
+      {
+        "type": "code",
+        "caption": "Four ways to open the box — all of them safe.",
+        "code": "var nickname: String? = nil       // the box is empty\nnickname = \"Ada\"                  // now it holds a value\n\n// Optional binding: open the box, and only run if something was inside\nif let nickname {\n    print(\"Hello, \\(nickname)\")   // nickname is String here, not String?\n}\n\n// guard: leave early when the box is empty\nfunc greet(_ nickname: String?) -> String {\n    guard let nickname else { return \"Hello, stranger\" }\n    return \"Hello, \\(nickname)\"\n}\n\n// Nil-coalescing: a default when the box is empty\nlet display = nickname ?? \"Anonymous\"\n\n// Optional chaining: do nothing gracefully if anything along the way is nil\nlet initial = nickname?.first        // Character?\nlet shout   = nickname?.uppercased() // String?",
+        "id": "optionals-s3"
+      },
+      {
+        "type": "underTheHood",
+        "body": "`Optional` isn't compiler magic. It's an ordinary enum in the standard library:\n\n```\nenum Optional<Wrapped> {\n    case none\n    case some(Wrapped)\n}\n```\n\n`String?` is sugar for `Optional<String>`, `nil` is sugar for `.none`, and optional binding is sugar for pattern-matching `.some`. That's why you can `switch` over an optional, and why `Optional` gets `map` and `flatMap` like any other container.\n\nThe compiler does add one optimisation worth knowing: for class references and other pointer-shaped types, an optional costs *no extra memory*. The all-zeroes pointer is reused to mean `.none`. This is called a spare-bit representation. So `UIView?` is the same size as `UIView` — you're not paying for the safety.",
+        "id": "optionals-s4"
+      },
+      {
+        "type": "diagram",
+        "title": "Unwrapping an optional",
+        "altText": "An Optional<String> branches into two cases: .some, holding the string \"Ada\", which flows to safe use; and .none, which flows to a default value.",
+        "nodes": [
+          {
+            "id": "box",
+            "label": "String?",
+            "detail": "Optional<String>",
+            "x": 0.5,
+            "y": 0.12,
+            "style": "object"
+          },
+          {
+            "id": "some",
+            "label": ".some(\"Ada\")",
+            "detail": "A value is present",
+            "x": 0.22,
+            "y": 0.5,
+            "style": "owner"
+          },
+          {
+            "id": "none",
+            "label": ".none",
+            "detail": "nil",
+            "x": 0.78,
+            "y": 0.5,
+            "style": "note"
+          },
+          {
+            "id": "use",
+            "label": "Use it",
+            "detail": "Compiler sees String",
+            "x": 0.22,
+            "y": 0.87,
+            "style": "view"
+          },
+          {
+            "id": "default",
+            "label": "Use a default",
+            "detail": "?? \"Anonymous\"",
+            "x": 0.78,
+            "y": 0.87,
+            "style": "view"
+          }
+        ],
+        "edges": [
+          {
+            "id": "e1",
+            "from": "box",
+            "to": "some",
+            "label": "if let",
+            "style": "flow"
+          },
+          {
+            "id": "e2",
+            "from": "box",
+            "to": "none",
+            "label": "else",
+            "style": "dashed"
+          },
+          {
+            "id": "e3",
+            "from": "some",
+            "to": "use",
+            "style": "flow"
+          },
+          {
+            "id": "e4",
+            "from": "none",
+            "to": "default",
+            "style": "dashed"
+          }
+        ],
+        "steps": [
+          {
+            "id": "st1",
+            "caption": "An optional is one of exactly two cases.",
+            "nodeIDs": [
+              "box"
+            ],
+            "edgeIDs": []
+          },
+          {
+            "id": "st2",
+            "caption": "If a value is present, binding gives you the unwrapped type.",
+            "nodeIDs": [
+              "some",
+              "use"
+            ],
+            "edgeIDs": [
+              "e1",
+              "e3"
+            ]
+          },
+          {
+            "id": "st3",
+            "caption": "If it's nil, you must say what happens instead — the compiler won't let you skip it.",
+            "nodeIDs": [
+              "none",
+              "default"
+            ],
+            "edgeIDs": [
+              "e2",
+              "e4"
+            ]
+          }
+        ],
+        "id": "optionals-s5"
+      },
+      {
+        "type": "callout",
+        "style": "mistake",
+        "title": "Reaching for ! to make the error go away",
+        "body": "`!` doesn't handle the empty case, it asserts the case can't happen. When that assertion is wrong the app crashes with \"Unexpectedly found nil\" — and it crashes on the user's device, not yours.\n\n`!` is defensible when absence is genuinely a programmer error you want to fail loudly on (an outlet that must be connected, a bundled resource that must exist). It's not a shortcut for \"I don't want to write `guard let` right now\".",
+        "id": "optionals-s6"
+      },
+      {
+        "type": "quickCheck",
+        "refID": "q-optionals-1",
+        "id": "optionals-s7"
+      },
+      {
+        "type": "interview",
+        "refID": "i-optionals-1",
+        "id": "optionals-s8"
+      },
+      {
+        "type": "trivia",
+        "refID": "t-optionals-1",
+        "id": "optionals-s9"
+      },
+      {
+        "type": "keyTakeaway",
+        "body": "An optional makes absence part of the type, so the compiler forces you to decide what happens when there's nothing there. Every `!` you write is you taking that decision back off the compiler and onto yourself.",
+        "id": "optionals-s10"
+      }
+    ],
+    "quizIDs": [
+      "q-optionals-1",
+      "q-optionals-2",
+      "q-optionals-3"
+    ],
+    "triviaIDs": [
+      "t-optionals-1",
+      "t-optionals-2"
+    ],
+    "interviewQuestionIDs": [
+      "i-optionals-1"
+    ],
+    "relatedConceptIDs": [
+      "struct-vs-class",
+      "closures"
+    ],
+    "prerequisiteIDs": []
+  },
+  {
+    "id": "closures",
+    "title": "Closures",
+    "subtitle": "Functions you can pass around — and the variables they quietly take with them.",
+    "categoryID": "swift",
+    "difficulty": "intermediate",
+    "estimatedMinutes": 9,
+    "tags": [
+      "closure",
+      "capture",
+      "escaping",
+      "functions"
+    ],
+    "sections": [
+      {
+        "type": "explanation",
+        "body": "A closure is a block of code you can store in a variable, pass to a function, and call later. That much is just \"a function without a name\".\n\nThe important half is in the word *closure*: it closes over the variables around it. When you write a closure that mentions `count`, it doesn't copy the current value of `count` and forget where it came from — it keeps a reference to the actual storage, and keeps that storage alive for as long as the closure exists.\n\nThat's what makes closures powerful, and it's also the source of nearly every retain cycle in an iOS codebase.",
+        "id": "closures-s1"
+      },
+      {
+        "type": "analogy",
+        "body": "A closure is a to-do note that says \"send the report to Sam\".\n\nThe note isn't self-contained. It refers to Sam. As long as that note exists in somebody's pocket, Sam has to stick around — you can't dismiss Sam while a note referring to them is still pending.\n\nA capture list is rewriting the note to say \"send the report to Sam, but if Sam has already left, just bin the note\". Same instruction, but it no longer forces Sam to stay.",
+        "id": "closures-s2"
+      },
+      {
+        "type": "code",
+        "caption": "`count` outlives `makeCounter` because the returned closure captured it.",
+        "code": "// A closure stored in a variable\nlet double: (Int) -> Int = { n in n * 2 }\n\n// Captured storage is shared, not copied\nfunc makeCounter() -> () -> Int {\n    var count = 0                 // lives on past this function returning\n    return { count += 1; return count }\n}\nlet next = makeCounter()\nnext()  // 1\nnext()  // 2   — the same `count`, still alive\n\n// Trailing closure syntax\nlet evens = (1...10).filter { $0.isMultiple(of: 2) }",
+        "id": "closures-s3"
+      },
+      {
+        "type": "explanation",
+        "heading": "Escaping and non-escaping",
+        "body": "**Escaping vs non-escaping**\n\nA closure parameter is *non-escaping* by default: the function promises to call it before returning and not store it anywhere. That promise is what lets you use `self` inside without writing `self.`, because there's no way the closure can outlive the call.\n\nMark it `@escaping` and the promise is gone — the closure may be stored, queued, or called later. Now Swift makes you write `self` explicitly, precisely so that capturing `self` is a visible decision rather than an accident.\n\nThat required `self.` isn't bureaucracy. It's the compiler asking: *are you sure you want this object kept alive until this closure runs?*",
+        "id": "closures-s4"
+      },
+      {
+        "type": "code",
+        "caption": "The compiler forces `self.` in escaping closures so the capture is deliberate.",
+        "code": "final class Loader {\n    var onFinish: (() -> Void)?\n\n    // non-escaping: called before we return, no `self.` needed\n    func each(_ items: [Int], _ body: (Int) -> Void) {\n        for item in items { body(item) }\n    }\n\n    // @escaping: stored for later — `self.` is now mandatory\n    func whenDone(_ handler: @escaping () -> Void) {\n        onFinish = handler\n    }\n\n    func start() {\n        whenDone { [weak self] in\n            self?.cleanUp()      // weak: the closure no longer keeps Loader alive\n        }\n    }\n\n    func cleanUp() {}\n}",
+        "id": "closures-s5"
+      },
+      {
+        "type": "underTheHood",
+        "body": "A closure is two things bolted together: a function pointer, and a heap-allocated *context box* holding the captured variables. Swift calls this pair a thick function value.\n\nThat box is reference counted like any object. Captured `var`s are promoted from the stack to that box — which is why `count` in the example survives `makeCounter` returning, and why two closures capturing the same variable genuinely share it rather than each getting a copy.\n\nA non-escaping closure can skip the heap entirely: since it provably doesn't outlive the call, the compiler can keep its context on the stack. That's the real reason non-escaping is the default — it's the faster case, and `@escaping` is you opting into the allocation.",
+        "id": "closures-s6"
+      },
+      {
+        "type": "callout",
+        "style": "mistake",
+        "title": "Assuming a capture list copies everything",
+        "body": "`[weak self]` only changes how `self` is captured. Everything else the closure mentions is still captured strongly, including other objects, and including `self` if you also reference it implicitly through a property.\n\nAnd `[weak self]` alone doesn't make a closure safe — it makes `self` optional. If the closure fires after `self` is gone, `self?.doThing()` silently does nothing. Sometimes that's exactly right; sometimes it means a callback you were relying on never happened.",
+        "id": "closures-s7"
+      },
+      {
+        "type": "quickCheck",
+        "refID": "q-closures-1",
+        "id": "closures-s8"
+      },
+      {
+        "type": "interview",
+        "refID": "i-closures-1",
+        "id": "closures-s9"
+      },
+      {
+        "type": "trivia",
+        "refID": "t-closures-1",
+        "id": "closures-s10"
+      },
+      {
+        "type": "keyTakeaway",
+        "body": "A closure captures storage, not values, and keeps that storage alive. Ask of every escaping closure: what does this keep alive, and for how long?",
+        "id": "closures-s11"
+      }
+    ],
+    "quizIDs": [
+      "q-closures-1",
+      "q-closures-2",
+      "q-closures-3"
+    ],
+    "triviaIDs": [
+      "t-closures-1",
+      "t-closures-2"
+    ],
+    "interviewQuestionIDs": [
+      "i-closures-1"
+    ],
+    "relatedConceptIDs": [
+      "closure-capture",
+      "retain-cycles",
+      "async-await"
+    ],
+    "prerequisiteIDs": [
+      "optionals"
+    ]
+  },
+  {
+    "id": "struct-vs-class",
+    "title": "Struct vs Class",
+    "subtitle": "Value semantics versus reference semantics, and why Swift pushes you toward structs.",
+    "categoryID": "swift",
+    "difficulty": "beginner",
+    "estimatedMinutes": 8,
+    "tags": [
+      "struct",
+      "class",
+      "value",
+      "reference",
+      "semantics"
+    ],
+    "sections": [
+      {
+        "type": "explanation",
+        "body": "A struct is a *value*. When you assign it or pass it to a function, you get an independent copy. Changing the copy can't affect the original.\n\nA class is a *reference*. When you assign it, both names point at the same object in memory. Changing it through one name changes it for everyone holding a reference.\n\nEverything else — inheritance, deinit, reference counting, identity — follows from that one difference. Swift makes structs the default because most of the time, shared mutable state is a liability you didn't ask for.",
+        "id": "struct-vs-class-s1"
+      },
+      {
+        "type": "analogy",
+        "body": "A struct is a printed document. Hand someone a copy and scribble on yours — theirs is untouched. There's no such thing as \"the\" document; there are just documents that happen to have the same contents.\n\nA class is a shared Google Doc. Send someone the link and you're both looking at the same thing. When they edit a paragraph it changes under you, whether or not you were looking. That's useful when you *want* one shared truth, and dangerous when you don't.",
+        "id": "struct-vs-class-s2"
+      },
+      {
+        "type": "code",
+        "caption": "The `let` difference surprises people more than the copy does.",
+        "code": "struct PointValue { var x = 0 }\nfinal class PointRef { var x = 0 }\n\nvar a = PointValue(); var b = a\nb.x = 10\n// a.x == 0   — b is an independent copy\n\nlet c = PointRef(); let d = c\nd.x = 10\n// c.x == 10  — same object, and note `let` didn't stop the mutation\n\n// `let` on a struct freezes its contents; on a class it only freezes the pointer\nlet frozen = PointValue()\n// frozen.x = 1        // error: frozen is a let constant\nlet stillMutable = PointRef()\nstillMutable.x = 1     // fine — the reference is constant, the object isn't",
+        "id": "struct-vs-class-s3"
+      },
+      {
+        "type": "diagram",
+        "title": "Copy versus share",
+        "altText": "Two struct variables a and b each point at their own separate storage. Two class variables c and d both point at one shared object.",
+        "nodes": [
+          {
+            "id": "a",
+            "label": "var a",
+            "x": 0.15,
+            "y": 0.2,
+            "style": "owner"
+          },
+          {
+            "id": "b",
+            "label": "var b",
+            "x": 0.15,
+            "y": 0.62,
+            "style": "owner"
+          },
+          {
+            "id": "boxa",
+            "label": "x = 0",
+            "detail": "a's own storage",
+            "x": 0.42,
+            "y": 0.2,
+            "style": "object"
+          },
+          {
+            "id": "boxb",
+            "label": "x = 10",
+            "detail": "b's own storage",
+            "x": 0.42,
+            "y": 0.62,
+            "style": "object"
+          },
+          {
+            "id": "c",
+            "label": "let c",
+            "x": 0.62,
+            "y": 0.2,
+            "style": "owner"
+          },
+          {
+            "id": "d",
+            "label": "let d",
+            "x": 0.62,
+            "y": 0.62,
+            "style": "owner"
+          },
+          {
+            "id": "shared",
+            "label": "x = 10",
+            "detail": "one shared object",
+            "x": 0.88,
+            "y": 0.41,
+            "style": "object"
+          }
+        ],
+        "edges": [
+          {
+            "id": "ea",
+            "from": "a",
+            "to": "boxa",
+            "style": "strong"
+          },
+          {
+            "id": "eb",
+            "from": "b",
+            "to": "boxb",
+            "style": "strong"
+          },
+          {
+            "id": "ec",
+            "from": "c",
+            "to": "shared",
+            "style": "strong"
+          },
+          {
+            "id": "ed",
+            "from": "d",
+            "to": "shared",
+            "style": "strong"
+          }
+        ],
+        "steps": [
+          {
+            "id": "s1",
+            "caption": "Assigning a struct copies the storage — two variables, two boxes.",
+            "nodeIDs": [
+              "a",
+              "b",
+              "boxa",
+              "boxb"
+            ],
+            "edgeIDs": [
+              "ea",
+              "eb"
+            ]
+          },
+          {
+            "id": "s2",
+            "caption": "Assigning a class copies the pointer — two variables, one box.",
+            "nodeIDs": [
+              "c",
+              "d",
+              "shared"
+            ],
+            "edgeIDs": [
+              "ec",
+              "ed"
+            ]
+          }
+        ],
+        "id": "struct-vs-class-s4"
+      },
+      {
+        "type": "underTheHood",
+        "body": "Structs don't automatically live on the stack, and classes aren't automatically slow. The real distinctions are:\n\n**Allocation.** A class instance is always a heap allocation with a reference count and a type header. A struct is stored inline wherever it lives — on the stack as a local, or inside its owner's memory as a property. A struct property inside a class instance is on the heap too.\n\n**Copy on write.** Standard-library collections are structs, but copying an `Array` doesn't copy its elements. Both copies share one buffer, and the buffer is only duplicated when one of them is mutated *and* the reference count says it isn't uniquely held. That's why value semantics stay affordable at scale — and you can implement the same trick yourself with `isKnownUniquelyReferenced`.\n\n**Dispatch.** A method on a `final class` or a struct can be called directly. A non-final class method goes through a vtable so subclasses can override it.",
+        "id": "struct-vs-class-s5"
+      },
+      {
+        "type": "callout",
+        "style": "mistake",
+        "title": "Reaching for a class because \"the data is big\"",
+        "body": "Copy-on-write means a struct holding an array or string isn't copied wholesale on assignment — only the small outer value is, and the shared buffer is duplicated lazily on mutation.\n\nPick a class when you need *identity* (this is the same object, not merely an equal one), shared mutable state that many owners must observe, a deinit, or Objective-C interop. Size alone is rarely the reason.",
+        "id": "struct-vs-class-s6"
+      },
+      {
+        "type": "quickCheck",
+        "refID": "q-struct-vs-class-1",
+        "id": "struct-vs-class-s7"
+      },
+      {
+        "type": "interview",
+        "refID": "i-struct-vs-class-1",
+        "id": "struct-vs-class-s8"
+      },
+      {
+        "type": "trivia",
+        "refID": "t-struct-vs-class-1",
+        "id": "struct-vs-class-s9"
+      },
+      {
+        "type": "keyTakeaway",
+        "body": "Default to a struct. Reach for a class when you specifically need identity, shared mutation, inheritance, or deinit — and know that you're taking on reference counting and the possibility of cycles when you do.",
+        "id": "struct-vs-class-s10"
+      }
+    ],
+    "quizIDs": [
+      "q-struct-vs-class-1",
+      "q-struct-vs-class-2",
+      "q-struct-vs-class-3"
+    ],
+    "triviaIDs": [
+      "t-struct-vs-class-1",
+      "t-struct-vs-class-2"
+    ],
+    "interviewQuestionIDs": [
+      "i-struct-vs-class-1"
+    ],
+    "relatedConceptIDs": [
+      "arc",
+      "protocols",
+      "state"
+    ],
+    "prerequisiteIDs": []
+  },
+  {
+    "id": "protocols",
+    "title": "Protocols",
+    "subtitle": "Describing what a type can do, so code can depend on behaviour instead of concrete types.",
+    "categoryID": "swift",
+    "difficulty": "intermediate",
+    "estimatedMinutes": 9,
+    "tags": [
+      "protocol",
+      "generics",
+      "existential",
+      "abstraction"
+    ],
+    "sections": [
+      {
+        "type": "explanation",
+        "body": "A protocol is a list of requirements — methods, properties, initialisers — that a conforming type promises to provide. Code written against the protocol works with any type that conforms, present or future.\n\nIn an object-oriented language you'd reach for a base class here. Protocols do the job without the inheritance: a struct can conform, an enum can conform, a type can conform to many protocols, and you can add conformance to a type you don't own via an extension. That's why Swift can push value types so hard and still let you abstract.\n\nThe everyday payoff is testability. A view model that depends on `ContentLoading` rather than `NetworkContentLoader` can be handed a stub in a test without a server in sight.",
+        "id": "protocols-s1"
+      },
+      {
+        "type": "analogy",
+        "body": "A protocol is a job description, not a job title.\n\n\"Must be able to take payment and issue a receipt\" describes what you need. A card reader satisfies it, a cash till satisfies it, and so does a person with a notebook. You wrote the shop's process against the description, so you can swap the implementation without rewriting the process.\n\nInheritance, by contrast, is \"must be a kind of till\" — which rules out the notebook even though it would have worked fine.",
+        "id": "protocols-s2"
+      },
+      {
+        "type": "code",
+        "caption": "Conformance is opt-in and additive — including for types you didn't write.",
+        "code": "protocol ContentLoading {\n    func loadConcepts() async throws -> [String]\n}\n\n// A struct conforms — no base class, no inheritance\nstruct BundleLoader: ContentLoading {\n    func loadConcepts() async throws -> [String] { [\"arc\", \"actors\"] }\n}\n\n// So does a test double\nstruct FailingLoader: ContentLoading {\n    func loadConcepts() async throws -> [String] { throw URLError(.notConnectedToInternet) }\n}\n\n// Default behaviour for every conformer, in one place\nextension ContentLoading {\n    func loadCount() async throws -> Int { try await loadConcepts().count }\n}\n\n// Retroactive conformance: teach a type you don't own a new trick\nextension Int: @retroactive Identifiable {\n    public var id: Int { self }\n}",
+        "id": "protocols-s3"
+      },
+      {
+        "type": "explanation",
+        "heading": "some versus any",
+        "body": "**`some` versus `any`**\n\n`some ContentLoading` means *one specific conforming type, chosen at compile time*. The compiler knows exactly which type it is, so the call is static and there's no box. This is an opaque type, and it's shorthand for a generic parameter.\n\n`any ContentLoading` means *any conforming type, possibly different each time*. The value is wrapped in an existential box and calls go through a witness table at runtime. That flexibility costs an indirection — and it's what you need when you're storing a heterogeneous array of conformers.\n\nRule of thumb: `some` when there's one type and the caller doesn't need to know it, `any` when the type genuinely varies at runtime.",
+        "id": "protocols-s4"
+      },
+      {
+        "type": "code",
+        "caption": "`some` and generics are the same mechanism seen from two directions.",
+        "code": "// One concrete type, resolved at compile time — no runtime box\nfunc makeLoader() -> some ContentLoading { BundleLoader() }\n\n// Genuinely heterogeneous — needs the existential box\nlet loaders: [any ContentLoading] = [BundleLoader(), FailingLoader()]\n\n// Generic constraint: the caller picks the type, the body stays static\nfunc count<L: ContentLoading>(using loader: L) async throws -> Int {\n    try await loader.loadConcepts().count\n}",
+        "id": "protocols-s5"
+      },
+      {
+        "type": "underTheHood",
+        "body": "Calling a method through `any Protocol` uses a *witness table*: a table of function pointers, one per requirement, produced when the type declares conformance. The existential value carries a pointer to the value (or the value inline if it's small enough for the three-word buffer) plus a pointer to that table.\n\nWith `some Protocol` or a generic parameter, the compiler knows the concrete type at the call site, so it can look the witness up statically and often inline it entirely.\n\nA protocol with associated types or `Self` requirements couldn't be used as `any` at all before Swift 5.7, because the box has no way to express \"and the element type is the same one you got last time\". It's allowed now, but the compiler asks you to open the existential before using those members — which is why you sometimes need a generic function to do the work.",
+        "id": "protocols-s6"
+      },
+      {
+        "type": "callout",
+        "style": "mistake",
+        "title": "Writing a protocol for one implementation",
+        "body": "A protocol with exactly one conformer and no test double isn't abstraction, it's an extra file to keep in sync. Every call now has an indirection you can't follow in the editor without a jump.\n\nAdd the protocol when there's a second implementation — including a test stub, which counts. Until then the concrete type is easier to read and trivially easy to extract later.",
+        "id": "protocols-s7"
+      },
+      {
+        "type": "quickCheck",
+        "refID": "q-protocols-1",
+        "id": "protocols-s8"
+      },
+      {
+        "type": "interview",
+        "refID": "i-protocols-1",
+        "id": "protocols-s9"
+      },
+      {
+        "type": "trivia",
+        "refID": "t-protocols-1",
+        "id": "protocols-s10"
+      },
+      {
+        "type": "keyTakeaway",
+        "body": "Protocols let code depend on behaviour rather than concrete types, without inheritance. Use `some` when one type is involved and `any` only when the type genuinely varies at runtime — and don't add a protocol until there's a second implementation.",
+        "id": "protocols-s11"
+      }
+    ],
+    "quizIDs": [
+      "q-protocols-1",
+      "q-protocols-2",
+      "q-protocols-3"
+    ],
+    "triviaIDs": [
+      "t-protocols-1",
+      "t-protocols-2"
+    ],
+    "interviewQuestionIDs": [
+      "i-protocols-1"
+    ],
+    "relatedConceptIDs": [
+      "struct-vs-class",
+      "sendable",
+      "observation"
+    ],
+    "prerequisiteIDs": [
+      "struct-vs-class"
+    ]
+  }
+]

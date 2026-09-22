@@ -1,0 +1,661 @@
+[
+  {
+    "id": "async-await",
+    "title": "async / await",
+    "subtitle": "Writing code that waits without blocking, and reads top to bottom.",
+    "categoryID": "concurrency",
+    "difficulty": "intermediate",
+    "estimatedMinutes": 9,
+    "tags": [
+      "async",
+      "await",
+      "task",
+      "suspension"
+    ],
+    "sections": [
+      {
+        "type": "explanation",
+        "body": "`async` marks a function that may suspend. `await` marks the point where it might.\n\nSuspending is not blocking. A blocked thread sits there occupying a resource while it waits. A suspended function *gives its thread back*: the runtime saves where it was, lets the thread pick up other work, and resumes the function later — possibly on a different thread entirely.\n\nThe practical win is that asynchronous code reads like synchronous code. No completion handler nesting, `try`/`catch` works normally, and a loop with an `await` in it is just a loop rather than a recursive callback.",
+        "id": "async-await-s1"
+      },
+      {
+        "type": "analogy",
+        "body": "You're cooking and you put a pan on to simmer for ten minutes.\n\nBlocking is standing in front of the pan doing nothing for ten minutes. You're occupied, and nothing else in the kitchen progresses.\n\nAwaiting is setting a timer and going to chop vegetables. The kitchen — the thread — stays busy with other work, and you come back when the timer goes. You might even come back to a different hob. What you can't assume is that the kitchen looks the way you left it, because other people were working in it while you were away.",
+        "id": "async-await-s2"
+      },
+      {
+        "type": "code",
+        "caption": "`async let` starts both immediately; sequential `await`s would run them one after the other.",
+        "code": "// Before: nesting, and errors handled by hand\nfunc loadProfile(completion: @escaping (Result<Profile, Error>) -> Void) {\n    fetchUser { result in\n        switch result {\n        case .success(let user):\n            fetchAvatar(user.id) { avatarResult in\n                // ...and so on\n            }\n        case .failure(let error): completion(.failure(error))\n        }\n    }\n}\n\n// After: sequential, with ordinary error handling\nfunc loadProfile() async throws -> Profile {\n    let user   = try await fetchUser()\n    let avatar = try await fetchAvatar(user.id)\n    return Profile(user: user, avatar: avatar)\n}\n\n// Independent work should actually overlap\nfunc loadProfileConcurrently() async throws -> Profile {\n    async let user   = fetchUser()\n    async let banner = fetchBanner()\n    return try await Profile(user: user, banner: banner)\n}",
+        "id": "async-await-s3"
+      },
+      {
+        "type": "diagram",
+        "title": "Suspension gives the thread back",
+        "altText": "An async function runs on a thread, suspends at an await, releasing the thread to do other work, then resumes later — possibly on a different thread.",
+        "nodes": [
+          {
+            "id": "start",
+            "label": "Function starts",
+            "detail": "on thread A",
+            "x": 0.12,
+            "y": 0.3,
+            "style": "thread"
+          },
+          {
+            "id": "suspend",
+            "label": "await",
+            "detail": "suspension point",
+            "x": 0.38,
+            "y": 0.3,
+            "style": "note"
+          },
+          {
+            "id": "other",
+            "label": "Other work",
+            "detail": "thread A is reused",
+            "x": 0.38,
+            "y": 0.78,
+            "style": "thread"
+          },
+          {
+            "id": "resume",
+            "label": "Resumes",
+            "detail": "maybe thread B",
+            "x": 0.68,
+            "y": 0.3,
+            "style": "thread"
+          },
+          {
+            "id": "done",
+            "label": "Returns",
+            "x": 0.92,
+            "y": 0.3,
+            "style": "view"
+          }
+        ],
+        "edges": [
+          {
+            "id": "e1",
+            "from": "start",
+            "to": "suspend",
+            "style": "flow"
+          },
+          {
+            "id": "e2",
+            "from": "suspend",
+            "to": "other",
+            "label": "thread released",
+            "style": "dashed"
+          },
+          {
+            "id": "e3",
+            "from": "suspend",
+            "to": "resume",
+            "label": "when ready",
+            "style": "flow"
+          },
+          {
+            "id": "e4",
+            "from": "resume",
+            "to": "done",
+            "style": "flow"
+          }
+        ],
+        "steps": [
+          {
+            "id": "s1",
+            "caption": "The function begins on some thread.",
+            "nodeIDs": [
+              "start"
+            ],
+            "edgeIDs": []
+          },
+          {
+            "id": "s2",
+            "caption": "At the await it suspends and hands the thread back. Nothing is blocked.",
+            "nodeIDs": [
+              "suspend",
+              "other"
+            ],
+            "edgeIDs": [
+              "e1",
+              "e2"
+            ]
+          },
+          {
+            "id": "s3",
+            "caption": "When the awaited work finishes, the function resumes — not necessarily on the same thread.",
+            "nodeIDs": [
+              "resume",
+              "done"
+            ],
+            "edgeIDs": [
+              "e3",
+              "e4"
+            ]
+          }
+        ],
+        "id": "async-await-s4"
+      },
+      {
+        "type": "underTheHood",
+        "body": "The compiler splits an `async` function at every suspension point into a chain of partial functions, and its local state moves off the stack into a heap-allocated async frame. Resuming means invoking the next partial function with that frame. This is why async functions can suspend at all: there's no stack frame to preserve.\n\nThose functions run on a *cooperative thread pool* sized to the number of CPU cores. It deliberately doesn't grow, which is what prevents the thread explosion GCD was prone to — dozens of blocked queues each spawning a thread. The trade is that you must never block a thread in that pool: a `sleep`, a semaphore wait, or synchronous file I/O inside an async function starves a core, and enough of them can deadlock the pool.\n\n`await` is also the *only* place a function can suspend. That's a strong guarantee: between two awaits your code runs without interruption on its isolation domain, so you know exactly where state can change beneath you.",
+        "id": "async-await-s5"
+      },
+      {
+        "type": "callout",
+        "style": "mistake",
+        "title": "Awaiting things one at a time that could have overlapped",
+        "body": "`let a = await first(); let b = await second()` runs `second` only after `first` finishes. If they're independent, you've made the operation twice as slow for no reason and the code gives no hint that anything is wrong.\n\n`async let` starts both immediately and awaits at the point of use; a `TaskGroup` does the same for a dynamic number of children. Reach for them whenever the work doesn't depend on the previous result.",
+        "id": "async-await-s6"
+      },
+      {
+        "type": "quickCheck",
+        "refID": "q-async-await-1",
+        "id": "async-await-s7"
+      },
+      {
+        "type": "interview",
+        "refID": "i-async-await-1",
+        "id": "async-await-s8"
+      },
+      {
+        "type": "trivia",
+        "refID": "t-async-await-1",
+        "id": "async-await-s9"
+      },
+      {
+        "type": "keyTakeaway",
+        "body": "`await` suspends rather than blocks — the thread goes back to the pool and your function resumes later, possibly elsewhere. Sequential awaits mean sequential work, so use `async let` or a task group when the work is independent.",
+        "id": "async-await-s10"
+      }
+    ],
+    "quizIDs": [
+      "q-async-await-1",
+      "q-async-await-2",
+      "q-async-await-3"
+    ],
+    "triviaIDs": [
+      "t-async-await-1",
+      "t-async-await-2"
+    ],
+    "interviewQuestionIDs": [
+      "i-async-await-1"
+    ],
+    "relatedConceptIDs": [
+      "actors",
+      "main-actor",
+      "closures"
+    ],
+    "prerequisiteIDs": [
+      "closures"
+    ]
+  },
+  {
+    "id": "actors",
+    "title": "Actors",
+    "subtitle": "A type that protects its own state, so data races become a compile error.",
+    "categoryID": "concurrency",
+    "difficulty": "advanced",
+    "estimatedMinutes": 9,
+    "tags": [
+      "actor",
+      "isolation",
+      "concurrency",
+      "data race"
+    ],
+    "sections": [
+      {
+        "type": "explanation",
+        "body": "An actor is a reference type whose mutable state can only be touched from inside itself. Any access from outside has to go through an `await`, and the runtime guarantees only one such access runs at a time.\n\nThat's the same guarantee a lock gives you, with two differences that matter. It's enforced by the compiler rather than by everyone remembering to take the lock. And waiting for the actor suspends instead of blocking, so a contended actor doesn't tie up threads.\n\nThe result: a whole class of data race stops being a debugging problem and becomes a compile error.",
+        "id": "actors-s1"
+      },
+      {
+        "type": "analogy",
+        "body": "An actor is a shop with one counter and one member of staff.\n\nCustomers queue. Only one is served at a time, so no two people are ever rearranging the stock simultaneously — the counter is a serialisation point, and that's what makes the inventory trustworthy.\n\nThe part that catches people out: if the assistant goes into the back room to check something, they serve the next customer while waiting. So when they come back to you, the shelves may have changed. That's actor reentrancy, and it's why an `await` inside an actor method invalidates whatever you checked before it.",
+        "id": "actors-s2"
+      },
+      {
+        "type": "code",
+        "caption": "Inside the actor, access is ordinary code. From outside, it's always `await`.",
+        "code": "actor ScoreBoard {\n    private var scores: [String: Int] = [:]\n\n    func record(_ points: Int, for player: String) {\n        scores[player, default: 0] += points     // inside: direct, synchronous\n    }\n\n    func score(for player: String) -> Int {\n        scores[player] ?? 0\n    }\n\n    nonisolated let boardID = UUID()             // immutable: no protection needed\n}\n\nlet board = ScoreBoard()\nawait board.record(10, for: \"ada\")               // outside: must await\nlet total = await board.score(for: \"ada\")\n_ = board.boardID                                // nonisolated: no await",
+        "id": "actors-s3"
+      },
+      {
+        "type": "diagram",
+        "title": "Actor isolation",
+        "altText": "Two tasks both call into an actor. The actor serialises them so only one executes against its protected state at a time, while the other suspends.",
+        "nodes": [
+          {
+            "id": "t1",
+            "label": "Task A",
+            "x": 0.1,
+            "y": 0.24,
+            "style": "thread"
+          },
+          {
+            "id": "t2",
+            "label": "Task B",
+            "x": 0.1,
+            "y": 0.76,
+            "style": "thread"
+          },
+          {
+            "id": "queue",
+            "label": "Actor queue",
+            "detail": "one at a time",
+            "x": 0.42,
+            "y": 0.5,
+            "style": "note"
+          },
+          {
+            "id": "actor",
+            "label": "ScoreBoard",
+            "detail": "isolated state",
+            "x": 0.72,
+            "y": 0.5,
+            "style": "actorBox"
+          },
+          {
+            "id": "state",
+            "label": "scores",
+            "detail": "never raced",
+            "x": 0.94,
+            "y": 0.5,
+            "style": "object"
+          }
+        ],
+        "edges": [
+          {
+            "id": "a1",
+            "from": "t1",
+            "to": "queue",
+            "label": "await",
+            "style": "flow"
+          },
+          {
+            "id": "a2",
+            "from": "t2",
+            "to": "queue",
+            "label": "await",
+            "style": "flow"
+          },
+          {
+            "id": "a3",
+            "from": "queue",
+            "to": "actor",
+            "label": "serialised",
+            "style": "flow"
+          },
+          {
+            "id": "a4",
+            "from": "actor",
+            "to": "state",
+            "style": "strong"
+          }
+        ],
+        "steps": [
+          {
+            "id": "s1",
+            "caption": "Both tasks call in. Each call is an await, not a blocking wait.",
+            "nodeIDs": [
+              "t1",
+              "t2",
+              "queue"
+            ],
+            "edgeIDs": [
+              "a1",
+              "a2"
+            ]
+          },
+          {
+            "id": "s2",
+            "caption": "The actor runs one at a time. The other task suspends and its thread is reused.",
+            "nodeIDs": [
+              "queue",
+              "actor"
+            ],
+            "edgeIDs": [
+              "a3"
+            ]
+          },
+          {
+            "id": "s3",
+            "caption": "Isolated state is only ever touched by whichever call is currently running.",
+            "nodeIDs": [
+              "actor",
+              "state"
+            ],
+            "edgeIDs": [
+              "a4"
+            ]
+          }
+        ],
+        "id": "actors-s4"
+      },
+      {
+        "type": "explanation",
+        "heading": "Reentrancy",
+        "body": "**Reentrancy is the sharp edge**\n\nActors are reentrant: when an actor method suspends at an `await`, the actor is free to start another call. This is what stops one slow operation from deadlocking everything waiting on the actor — but it means state you checked before an `await` may have changed by the time you resume.\n\nSo the guarantee is narrower than \"one thing at a time\". It's: *your code runs uninterrupted between awaits*. Any invariant that has to hold across an `await` must be re-checked after it, or defended with an explicit in-progress flag.",
+        "id": "actors-s5"
+      },
+      {
+        "type": "code",
+        "caption": "Without the in-flight map, reentrancy would let two callers both start the same download.",
+        "code": "actor ImageCache {\n    private var cache: [URL: Image] = [:]\n    private var inFlight: [URL: Task<Image, Error>] = [:]\n\n    func image(at url: URL) async throws -> Image {\n        if let cached = cache[url] { return cached }\n        if let existing = inFlight[url] { return try await existing.value }  // dedupe\n\n        let task = Task { try await download(url) }\n        inFlight[url] = task\n        defer { inFlight[url] = nil }\n\n        let image = try await task.value\n        cache[url] = image\n        return image\n    }\n\n    private func download(_ url: URL) async throws -> Image { fatalError(\"…\") }\n}",
+        "id": "actors-s6"
+      },
+      {
+        "type": "callout",
+        "style": "mistake",
+        "title": "Assuming an actor makes everything sequential",
+        "body": "An actor serialises *access to its state*, not whole operations. The moment your method hits an `await`, another call can interleave.\n\nSo `if !cache.contains(key) { let v = await fetch(); cache[key] = v }` can run twice concurrently and fetch twice: both calls pass the check before either reaches the assignment. Track the in-flight work explicitly, as above.",
+        "id": "actors-s7"
+      },
+      {
+        "type": "quickCheck",
+        "refID": "q-actors-1",
+        "id": "actors-s8"
+      },
+      {
+        "type": "interview",
+        "refID": "i-actors-1",
+        "id": "actors-s9"
+      },
+      {
+        "type": "trivia",
+        "refID": "t-actors-1",
+        "id": "actors-s10"
+      },
+      {
+        "type": "keyTakeaway",
+        "body": "An actor makes exclusive access to its state a compile-time guarantee instead of a convention. It is reentrant, so treat every `await` inside an actor as a point where your assumptions expire.",
+        "id": "actors-s11"
+      }
+    ],
+    "quizIDs": [
+      "q-actors-1",
+      "q-actors-2",
+      "q-actors-3"
+    ],
+    "triviaIDs": [
+      "t-actors-1",
+      "t-actors-2"
+    ],
+    "interviewQuestionIDs": [
+      "i-actors-1"
+    ],
+    "relatedConceptIDs": [
+      "main-actor",
+      "sendable",
+      "async-await"
+    ],
+    "prerequisiteIDs": [
+      "async-await"
+    ]
+  },
+  {
+    "id": "main-actor",
+    "title": "MainActor",
+    "subtitle": "The global actor that owns the UI — and why being on it isn't the same as being fast.",
+    "categoryID": "concurrency",
+    "difficulty": "intermediate",
+    "estimatedMinutes": 7,
+    "tags": [
+      "mainactor",
+      "ui",
+      "isolation",
+      "main thread"
+    ],
+    "sections": [
+      {
+        "type": "explanation",
+        "body": "`@MainActor` is a global actor whose executor is the main thread. Marking a type, method, or property with it means that code runs on the main thread, and the compiler checks it — calling into it from elsewhere requires `await`.\n\nUIKit and SwiftUI are main-actor bound because view state must be mutated from one place. Before Swift Concurrency this was a documented convention enforced by crashes and assertions. Now it's a type-system rule, so \"UIKit called from a background thread\" moves from a runtime mystery to a compile error.\n\nThis project is built with `SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor`, so types are main-actor isolated unless they opt out — the safe default for an app that's mostly UI.",
+        "id": "main-actor-s1"
+      },
+      {
+        "type": "analogy",
+        "body": "The main actor is a single stage with one microphone.\n\nEverything the audience sees has to happen at that microphone, and only one performer can hold it at a time. That's what keeps the show coherent — no two people describing different scenes at once.\n\nIt also means anyone who grabs the mic and reads out a long document blocks the entire show. Being on stage doesn't make you fast; it makes you exclusive. The work belongs backstage, and you come back to the mic to announce the result.",
+        "id": "main-actor-s2"
+      },
+      {
+        "type": "code",
+        "caption": "Mark the UI type, not the work. The hop back after `await` is automatic.",
+        "code": "@MainActor\nfinal class ProfileViewModel {\n    var name = \"\"            // main-actor isolated\n    var isLoading = false\n\n    func load() async {\n        isLoading = true\n        // hop off to do the slow part\n        let profile = await ProfileLoader().fetch()   // not main-actor isolated\n        // back on the main actor automatically after the await\n        name = profile.name\n        isLoading = false\n    }\n}\n\n// Not main-actor bound: free to run on the cooperative pool\nstruct ProfileLoader {\n    nonisolated func fetch() async -> Profile { … }\n}\n\n// Marking one function rather than a whole type\n@MainActor func present(_ alert: Alert) { … }",
+        "id": "main-actor-s3"
+      },
+      {
+        "type": "underTheHood",
+        "body": "A global actor is an actor whose instance is a singleton and whose executor you can name. `MainActor`'s executor dispatches to the main dispatch queue, so \"main actor\" and \"main thread\" line up in practice — but the isolation is the concept, and the thread is the implementation.\n\nWhen a main-actor function awaits something that isn't main-actor isolated, the continuation hops back to the main actor on resume. That hop is real work: enqueueing onto the main queue and waiting your turn. A tight loop that awaits a non-isolated function on each iteration pays it every time, which is a common and invisible performance bug.\n\n`MainActor.assumeIsolated` lets you assert you're already on it without a hop, and traps if you're wrong — useful in synchronous callbacks from frameworks that guarantee main-thread delivery but aren't annotated.",
+        "id": "main-actor-s4"
+      },
+      {
+        "type": "callout",
+        "style": "mistake",
+        "title": "Assuming @MainActor means the UI stays responsive",
+        "body": "It means the opposite kind of guarantee: your code runs *on the thread that draws*. Parsing a large JSON payload, resizing an image, or running a synchronous database query inside a main-actor function freezes the interface for exactly as long as it takes.\n\n`await` doesn't help either, if the awaited function is itself main-actor isolated — you suspend and resume on the same actor, and the main thread is still doing all the work. The fix is to move the work to a type that isn't main-actor bound, and only come back with the result.",
+        "id": "main-actor-s5"
+      },
+      {
+        "type": "quickCheck",
+        "refID": "q-main-actor-1",
+        "id": "main-actor-s6"
+      },
+      {
+        "type": "interview",
+        "refID": "i-main-actor-1",
+        "id": "main-actor-s7"
+      },
+      {
+        "type": "trivia",
+        "refID": "t-main-actor-1",
+        "id": "main-actor-s8"
+      },
+      {
+        "type": "keyTakeaway",
+        "body": "`@MainActor` is where UI state must live, not where work should happen. Keep it for state and presentation, push computation to non-isolated types, and remember every hop back has a cost.",
+        "id": "main-actor-s9"
+      }
+    ],
+    "quizIDs": [
+      "q-main-actor-1",
+      "q-main-actor-2",
+      "q-main-actor-3"
+    ],
+    "triviaIDs": [
+      "t-main-actor-1",
+      "t-main-actor-2"
+    ],
+    "interviewQuestionIDs": [
+      "i-main-actor-1"
+    ],
+    "relatedConceptIDs": [
+      "actors",
+      "async-await",
+      "state"
+    ],
+    "prerequisiteIDs": [
+      "actors"
+    ]
+  },
+  {
+    "id": "sendable",
+    "title": "Sendable & Data Races",
+    "subtitle": "How the compiler decides a value is safe to hand to another task.",
+    "categoryID": "concurrency",
+    "difficulty": "advanced",
+    "estimatedMinutes": 8,
+    "tags": [
+      "sendable",
+      "data race",
+      "concurrency",
+      "swift 6"
+    ],
+    "sections": [
+      {
+        "type": "explanation",
+        "body": "A data race is two threads touching the same memory with at least one of them writing. The results range from a stale read to a corrupted data structure to a crash that reproduces once a fortnight. They're among the hardest bugs to find because the code is correct in isolation and wrong only in the interleaving.\n\n`Sendable` is the compiler's answer: a marker protocol meaning \"a value of this type can cross into another isolation domain safely\". Anything you pass to a `Task`, send to an actor, or return from one has to be `Sendable`, and the compiler checks it.\n\nThis is the mechanism behind Swift 6's data-race safety. It turns a runtime bug class into a compile error.",
+        "id": "sendable-s1"
+      },
+      {
+        "type": "analogy",
+        "body": "Posting something to a colleague in another office.\n\nA printed document is fine to post — they get their own copy, and you can both scribble on your own without affecting the other. That's a value type: `Sendable`.\n\nThe key to your filing cabinet is not fine to post. Now you can both open the same drawer at the same time, and neither of you knows what the other is doing. That's a mutable class: not `Sendable`, unless you fit the cabinet with a lock everyone must use — which is `@unchecked Sendable`, and it's only as good as your promise.",
+        "id": "sendable-s2"
+      },
+      {
+        "type": "code",
+        "caption": "`@unchecked` is you overriding the compiler. Everything else it verifies.",
+        "code": "// Automatically Sendable: a struct of Sendable parts\nstruct Score: Sendable { let player: String; let points: Int }\n\n// Not Sendable: a class with mutable state, freely shareable\nfinal class Counter { var value = 0 }\n\n// Safe to share: immutable, and final so nobody adds mutable state\nfinal class Config: Sendable { let baseURL: URL; init(_ u: URL) { baseURL = u } }\n\n// Safe because *you* guarantee it — the compiler stops checking here\nfinal class LockedCounter: @unchecked Sendable {\n    private let lock = NSLock()\n    private var _value = 0\n    var value: Int { lock.withLock { _value } }\n    func increment() { lock.withLock { _value += 1 } }\n}\n\n// An actor is always Sendable: its state is protected by construction\nactor Tally { private var total = 0 }",
+        "id": "sendable-s3"
+      },
+      {
+        "type": "diagram",
+        "title": "Crossing an isolation boundary",
+        "altText": "A Sendable value type is copied across the boundary between two isolation domains. A non-Sendable mutable class is rejected by the compiler because both sides would share one object.",
+        "nodes": [
+          {
+            "id": "d1",
+            "label": "Task A",
+            "detail": "one isolation domain",
+            "x": 0.12,
+            "y": 0.5,
+            "style": "actorBox"
+          },
+          {
+            "id": "d2",
+            "label": "Task B",
+            "detail": "another domain",
+            "x": 0.88,
+            "y": 0.5,
+            "style": "actorBox"
+          },
+          {
+            "id": "value",
+            "label": "Score (Sendable)",
+            "detail": "copied — safe",
+            "x": 0.5,
+            "y": 0.2,
+            "style": "object"
+          },
+          {
+            "id": "klass",
+            "label": "Counter (not Sendable)",
+            "detail": "shared — rejected",
+            "x": 0.5,
+            "y": 0.8,
+            "style": "object"
+          }
+        ],
+        "edges": [
+          {
+            "id": "v1",
+            "from": "d1",
+            "to": "value",
+            "style": "flow"
+          },
+          {
+            "id": "v2",
+            "from": "value",
+            "to": "d2",
+            "label": "allowed",
+            "style": "flow"
+          },
+          {
+            "id": "k1",
+            "from": "d1",
+            "to": "klass",
+            "style": "strong"
+          },
+          {
+            "id": "k2",
+            "from": "klass",
+            "to": "d2",
+            "label": "compile error",
+            "style": "dashed"
+          }
+        ],
+        "steps": [
+          {
+            "id": "s1",
+            "caption": "A Sendable value is copied, so each domain gets its own — no shared memory.",
+            "nodeIDs": [
+              "d1",
+              "value",
+              "d2"
+            ],
+            "edgeIDs": [
+              "v1",
+              "v2"
+            ]
+          },
+          {
+            "id": "s2",
+            "caption": "A mutable class would be shared by reference, so the compiler refuses.",
+            "nodeIDs": [
+              "klass",
+              "d2"
+            ],
+            "edgeIDs": [
+              "k1",
+              "k2"
+            ]
+          }
+        ],
+        "id": "sendable-s4"
+      },
+      {
+        "type": "underTheHood",
+        "body": "`Sendable` has no requirements — it's a marker protocol, and conformance is checked entirely at compile time with nothing emitted at runtime.\n\nConformance is inferred where it's provably safe: a struct or enum whose stored properties are all `Sendable` gets it automatically; actors always have it, because their state is isolated by construction; a `final class` with only immutable `Sendable` stored properties can declare it. Non-final classes can't, because a subclass could add mutable state.\n\n`@unchecked Sendable` disables the check and puts the guarantee on you — appropriate when you're protecting state with a lock the compiler can't see, and a bug waiting to happen otherwise. `@Sendable` on a closure is the same idea for function values: it may cross domains, so everything it captures must be `Sendable` too.\n\nIn Swift 6 language mode these are errors. In Swift 5 mode — which this project uses — they're warnings you can enable incrementally, which is the intended migration path.",
+        "id": "sendable-s5"
+      },
+      {
+        "type": "callout",
+        "style": "mistake",
+        "title": "Silencing the warning with @unchecked Sendable",
+        "body": "It compiles, and that's the problem: you've told the compiler to stop checking a property you haven't actually established. The race is still there, now with a annotation asserting it isn't.\n\n`@unchecked` is legitimate for a type whose safety comes from a lock or a private queue the compiler can't reason about — and those deserve a comment saying what the guarantee is. If the answer is \"I think it's probably fine\", make the type an actor or an immutable value instead.",
+        "id": "sendable-s6"
+      },
+      {
+        "type": "quickCheck",
+        "refID": "q-sendable-1",
+        "id": "sendable-s7"
+      },
+      {
+        "type": "interview",
+        "refID": "i-sendable-1",
+        "id": "sendable-s8"
+      },
+      {
+        "type": "trivia",
+        "refID": "t-sendable-1",
+        "id": "sendable-s9"
+      },
+      {
+        "type": "keyTakeaway",
+        "body": "`Sendable` marks types safe to cross isolation boundaries, checked at compile time. Prefer immutable values and actors; treat `@unchecked` as a promise you must be able to explain.",
+        "id": "sendable-s10"
+      }
+    ],
+    "quizIDs": [
+      "q-sendable-1",
+      "q-sendable-2",
+      "q-sendable-3"
+    ],
+    "triviaIDs": [
+      "t-sendable-1",
+      "t-sendable-2"
+    ],
+    "interviewQuestionIDs": [
+      "i-sendable-1"
+    ],
+    "relatedConceptIDs": [
+      "actors",
+      "main-actor",
+      "struct-vs-class"
+    ],
+    "prerequisiteIDs": [
+      "actors"
+    ]
+  }
+]

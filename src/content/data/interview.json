@@ -1,0 +1,402 @@
+[
+  {
+    "id": "i-optionals-1",
+    "conceptID": "optionals",
+    "categoryID": "swift",
+    "level": "mid",
+    "question": "When is force-unwrapping with `!` a reasonable choice, and when is it a bug waiting to happen?",
+    "answer": "`!` is an assertion that a value cannot be absent. It's reasonable when absence would mean the program is already broken and you want to fail loudly and immediately: a resource you ship inside your own bundle, a storyboard outlet that must be connected, an invariant established two lines above. In those cases a crash on the developer's machine during the first run is *better* than silently degrading.\n\nIt's a bug waiting to happen the moment the value's absence depends on anything outside your control — a server response, user input, a file on disk, a cache that may have been evicted, a view that may not have loaded yet. Those aren't programmer errors, they're expected states, and they deserve `guard let` and a real fallback.\n\nThe test I apply: can I write down the invariant that guarantees this is non-nil, and is that invariant enforced by code I own? If not, don't force it.",
+    "keyPoints": [
+      "Distinguishes programmer error from expected runtime absence",
+      "Names concrete legitimate uses rather than saying \"never use it\"",
+      "Recognises crashing early can be preferable to silent corruption",
+      "Mentions that data from outside the process is never a candidate"
+    ],
+    "followUps": [
+      {
+        "id": "i-optionals-1-f1",
+        "question": "How would you find risky force-unwraps in an existing codebase?",
+        "answer": "Start with the crash reports — \"Unexpectedly found nil while unwrapping\" tells you the exact line, and the frequency tells you which ones actually matter, which beats auditing every `!` by hand. For prevention, a SwiftLint rule (`force_unwrapping`) can warn on new ones while leaving existing code alone, so the count only goes down. I'd also treat `try!` and `as!` the same way — same assertion, same failure mode."
+      }
+    ]
+  },
+  {
+    "id": "i-closures-1",
+    "conceptID": "closures",
+    "categoryID": "swift",
+    "level": "senior",
+    "question": "A colleague adds `[weak self]` to every closure in the codebase \"to be safe\". What's your response?",
+    "answer": "It's cargo-culting a real rule, and it introduces a different class of bug.\n\n`[weak self]` is the right tool when the closure is stored somewhere `self` can reach — a stored property, a subscription, a delegate-ish callback — because that's the shape that creates a cycle. It does nothing useful for a non-escaping closure like the one you pass to `map` or `forEach`: that closure cannot outlive the call, so there's no cycle to break, and you've added an optional unwrap and noise for nothing.\n\nWorse, it's actively wrong for one-shot escaping work you *want* to complete. If a network completion handler weakly captures `self` and the object is deallocated mid-flight, the handler runs and silently does nothing — no save, no cleanup, no log. That's a bug that never crashes and never appears in a stack trace, so it's much harder to find than the leak it was meant to prevent.\n\nSo: reach for `[weak self]` when the closure's lifetime is owned by `self`, and think about whether the work needs to finish before you weaken the reference that keeps it alive.",
+    "keyPoints": [
+      "Knows non-escaping closures can't create cycles, so weak there is pure noise",
+      "Identifies that weak self can silently skip work that needed to happen",
+      "Frames the decision around who owns the closure's lifetime",
+      "Doesn't reduce it to a blanket rule in either direction"
+    ],
+    "followUps": [
+      {
+        "id": "i-closures-1-f1",
+        "question": "How would you decide between `weak` and `unowned` for a closure capture?",
+        "answer": "`unowned` when the closure genuinely cannot outlive the object — a closure stored on `self` and only invoked by `self` — because it avoids the optional and the crash is loud if you're wrong about the invariant. `weak` whenever the closure's lifetime is controlled by someone else: a network layer, a timer, a notification centre. When I'm not certain, `weak`: an unnecessary `if let` costs nothing, an incorrect `unowned` crashes on a user's phone."
+      },
+      {
+        "id": "i-closures-1-f2",
+        "question": "Does `[weak self]` prevent all retain cycles in that closure?",
+        "answer": "No. It only changes how `self` is captured. Any other object the closure mentions is still captured strongly, so a closure holding a strong reference to a view model that holds the closure is still a cycle even with `[weak self]` present. And if the closure touches a property of `self` without going through the weak binding, you can end up capturing `self` anyway."
+      }
+    ]
+  },
+  {
+    "id": "i-struct-vs-class-1",
+    "conceptID": "struct-vs-class",
+    "categoryID": "swift",
+    "level": "mid",
+    "question": "How do you decide between a struct and a class for a new type?",
+    "answer": "I start from struct and require a reason to move.\n\nI move to a class when I need **identity** — when \"is this the same object?\" is a meaningful question distinct from \"are these equal?\". A user session, a network connection, a view controller: two of them with identical fields are still not interchangeable.\n\nAlso when I need **shared mutable state** that several owners must see change, when I need **deinit** to release something (an observer, a file handle, a socket), when I need **inheritance** or Objective-C interop, or when the object is genuinely long-lived and referenced from many places.\n\nEverything else — models decoded from JSON, geometry, configuration, anything I want to pass across threads without worrying — is a struct. Value semantics mean I can hand it to another part of the app and know nobody can mutate it behind my back, which removes a whole category of bug rather than requiring me to defend against it.\n\nI don't use size as a tiebreaker, because copy-on-write already handles large payloads.",
+    "keyPoints": [
+      "Defaults to struct and justifies the exception rather than the rule",
+      "Names identity as the core distinction, not performance",
+      "Mentions deinit, inheritance and ObjC interop as concrete class-only needs",
+      "Knows copy-on-write removes the \"too big to copy\" argument",
+      "Connects value semantics to thread safety"
+    ],
+    "followUps": [
+      {
+        "id": "i-struct-vs-class-1-f1",
+        "question": "Where does mutating come into this?",
+        "answer": "A struct's methods can't change `self` unless marked `mutating`, and you can only call a `mutating` method on a variable, never a constant. It's the same value-semantics rule surfacing in the method list: mutating a value means replacing it, so the compiler needs somewhere writable to put the result. Protocol requirements need `mutating` too if any struct conformer will mutate."
+      }
+    ]
+  },
+  {
+    "id": "i-protocols-1",
+    "conceptID": "protocols",
+    "categoryID": "swift",
+    "level": "senior",
+    "question": "When would you reach for a protocol, and when is one actively making a codebase worse?",
+    "answer": "The case for a protocol is a *seam*: a point where I genuinely need to swap what's on the other side. Two real implementations, or one real implementation plus a test double that lets me test without a network, a database, or a clock. That's a protocol earning its keep — it turns an untestable dependency into an injectable one.\n\nIt makes things worse when it's speculative. A protocol with one conformer, added because it felt like good architecture, costs you a second file, an indirection that breaks jump-to-definition, and often a pile of `any` boxing. Nobody can see what the code actually does without opening two files, and the abstraction usually turns out to be the wrong shape when the second implementation finally arrives — because it was designed against a sample size of one.\n\nThe other failure mode is protocols that mirror a single type's entire API surface. That's not an abstraction, it's a duplicate declaration you now maintain twice. A good protocol is narrower than its conformers: `ContentLoading` with one method, not `ContentLoaderProtocol` with all fourteen.\n\nExtracting a protocol later is a small, safe, mechanical refactor. Deleting one that's wired through forty files is not. So I let the second implementation pull it into existence.",
+    "keyPoints": [
+      "Ties the decision to a real second implementation, counting test doubles",
+      "Names concrete costs: navigation, boxing, extra file, wrong-shape abstraction",
+      "Calls out protocols that merely mirror one type's full API",
+      "Observes that extraction later is cheaper than removal later",
+      "Prefers narrow protocols over broad ones"
+    ],
+    "followUps": [
+      {
+        "id": "i-protocols-1-f1",
+        "question": "How do protocols with associated types change the picture?",
+        "answer": "They stop being usable as simple existentials. `any Collection` is legal since Swift 5.7, but the moment you touch a member whose signature mentions `Element`, you need to open the existential — usually by passing it into a generic function. In practice PATs push you toward generics: `func show<C: Collection>(_ items: C)` rather than `func show(_ items: any Collection)`. That's usually better anyway, since it keeps dispatch static."
+      },
+      {
+        "id": "i-protocols-1-f2",
+        "question": "How does this interact with SwiftUI's `some View`?",
+        "answer": "`some View` exists because a SwiftUI body's real type is an enormous nested generic — `VStack<TupleView<(Text, Button<Text>)>>` and worse. You can't write that down, and `any View` would box every view and destroy the static structure SwiftUI relies on for diffing. Opaque return types let the compiler keep the precise type while you write three words. It's the flagship use case that motivated the feature."
+      }
+    ]
+  },
+  {
+    "id": "i-arc-1",
+    "conceptID": "arc",
+    "categoryID": "memory",
+    "level": "mid",
+    "question": "Explain how ARC decides when to free an object, and where that logic falls short.",
+    "answer": "Each class instance has a strong reference count in its header. The compiler inserts retains and releases around assignments, captures and scope exits. When a release takes the count to zero, `deinit` runs synchronously on that thread and the memory is freed.\n\nThe important properties are that it's deterministic — no pause, no collector, deallocation happens at a point you can reason about — and that it's *local*. The decision only ever looks at one object's count.\n\nThat locality is where it falls short. A group of objects that reference each other keeps every count above zero, so the whole island is leaked even though nothing outside can reach it. A tracing garbage collector would find that by walking from the roots and noticing the island is unreachable; ARC has no roots and does no walking, so it can't. Breaking the cycle with `weak` or `unowned` on one edge is the developer's responsibility.\n\nThe trade is deliberate: predictable, low-latency deallocation and no runtime pauses, in exchange for having to think about ownership at cycle-shaped relationships.",
+    "keyPoints": [
+      "Describes the count, and that deinit is synchronous and immediate",
+      "Frames the limitation as locality — no reachability analysis",
+      "Contrasts with tracing GC accurately rather than vaguely",
+      "Presents it as an explicit trade-off, not a flaw"
+    ],
+    "followUps": [
+      {
+        "id": "i-arc-1-f1",
+        "question": "How would you find a leak like that in a running app?",
+        "answer": "Instruments' Leaks and Allocations instruments, and the memory graph debugger in Xcode, which draws the actual object graph and marks cycles — usually the fastest way to see the offending edge. For a quick check during development, a `print` or `os_log` in `deinit` on suspect types tells you immediately whether a screen is being released when you pop it. The pattern to watch for is memory that grows every time you push and pop the same screen and never comes back down."
+      }
+    ]
+  },
+  {
+    "id": "i-weak-vs-unowned-1",
+    "conceptID": "weak-vs-unowned",
+    "categoryID": "memory",
+    "level": "senior",
+    "question": "Walk me through choosing between `weak` and `unowned` for a specific relationship.",
+    "answer": "I ask one question: can I state an invariant that guarantees the referenced object outlives this reference, and is that invariant enforced by code I control?\n\nIf yes — the classic case being a child object created by its parent, stored only by that parent, and unreachable once the parent is gone — `unowned` is honest. It documents the guarantee in the type, avoids an optional that would always succeed, and if I've got the invariant wrong the trap tells me loudly and immediately rather than hiding.\n\nIf the answer is no, `weak`. And \"no\" covers more than people expect: anything whose lifetime the system controls, anything reachable from a collection someone else mutates, anything torn down asynchronously. A delegate is the standard example — the delegating object has no idea when its delegate goes away, so `weak var delegate` is the only defensible choice.\n\nThe asymmetry that decides ties: an unnecessary `weak` costs an optional unwrap and a small read overhead. An incorrect `unowned` costs a crash on a user's device, in a scenario you didn't reproduce. Those aren't comparable, so I default to `weak` under uncertainty and treat `unowned` as something I have to justify.",
+    "keyPoints": [
+      "Frames it as an invariant you can state and enforce, not a preference",
+      "Gives the parent-owns-child case as the legitimate unowned shape",
+      "Identifies delegates and system-owned lifetimes as weak territory",
+      "Reasons explicitly about the asymmetric cost of being wrong"
+    ],
+    "followUps": [
+      {
+        "id": "i-weak-vs-unowned-1-f1",
+        "question": "Is `unowned` ever preferable for reasons other than performance?",
+        "answer": "Yes — it's a stronger piece of documentation. `unowned` says \"this relationship is structural, this object cannot outlive that one\", and the compiler and runtime hold you to it. With `weak` every use site has to handle nil, which means readers can't tell whether nil is a real expected state or defensive noise. When the guarantee genuinely holds, `unowned` communicates it better."
+      },
+      {
+        "id": "i-weak-vs-unowned-1-f2",
+        "question": "What about `[unowned self]` in a closure stored on self?",
+        "answer": "That's the textbook fit — the closure is owned by `self`, so it cannot possibly outlive it. It's still worth checking nobody copies the closure out to somewhere with a longer life, because that's how the invariant quietly breaks later: the original author was right, and a refactor six months on moved the closure into a queue."
+      }
+    ]
+  },
+  {
+    "id": "i-retain-cycles-1",
+    "conceptID": "retain-cycles",
+    "categoryID": "memory",
+    "level": "senior",
+    "question": "Explain a retain cycle, and how you'd detect one in a production application.",
+    "answer": "A retain cycle is a loop of strong references. Because ARC frees an object only when its own count hits zero, and every object in the loop is being retained by another member of the loop, the whole group stays alive after it becomes unreachable. It's a leak with no crash and no error.\n\nFor detection I'd work in three layers.\n\n**During development**, a `deinit` log on view controllers and view models. Push a screen, pop it, watch for the line. It costs nothing and catches the majority of cycles the day they're introduced, which is when they're cheapest to fix.\n\n**When something's suspected**, Xcode's memory graph debugger. It renders the actual object graph and marks cycles directly, so you see which reference to weaken rather than guessing. Instruments' Allocations with a repeated push/pop is the companion — if the persistent-object count for a type climbs by one per visit and never comes down, that's your leak, and the generation summary tells you what's accumulating.\n\n**In production**, you don't see individual cycles — you see the aggregate. Memory-related terminations in MetricKit, and jetsam events in the organizer, tell you memory is the problem and which build regressed. Then you reproduce with the tools above. It's also worth logging peak footprint per session so a regression shows up as a trend rather than as user complaints.\n\nPrevention beats detection though: ownership pointing one way, weak delegates, `[weak self]` in stored closures, and reviewing subscriptions for what they capture.",
+    "keyPoints": [
+      "Correctly explains why counting can't detect a cycle",
+      "Gives a layered answer: dev-time, debugging, production telemetry",
+      "Names concrete tools — memory graph debugger, Allocations, MetricKit",
+      "Mentions the deinit-log technique as the cheap first line",
+      "Ends on prevention, not just detection"
+    ],
+    "followUps": [
+      {
+        "id": "i-retain-cycles-1-f1",
+        "question": "What's the most common cycle you see in SwiftUI or Combine code?",
+        "answer": "A subscription that captures `self` strongly and is stored in a `Set<AnyCancellable>` on that same object. The object owns the cancellable, the cancellable's closure owns the object. `sink { [weak self] in ... }` is the fix. It's easy to miss because the cycle runs through a closure and a framework type rather than through two of your own properties, so it doesn't look like the textbook diagram."
+      },
+      {
+        "id": "i-retain-cycles-1-f2",
+        "question": "Does a `Timer` cause this?",
+        "answer": "A repeating `Timer` scheduled with a target retains its target, and the run loop retains the timer, so a view controller that schedules one and never invalidates it is kept alive by the run loop indefinitely. Crucially `deinit` never runs, so you can't invalidate it there — that's the trap. Either invalidate in `viewDidDisappear`, or use the block-based API with `[weak self]`."
+      }
+    ]
+  },
+  {
+    "id": "i-closure-capture-1",
+    "conceptID": "closure-capture",
+    "categoryID": "memory",
+    "level": "staff",
+    "question": "How do you reason about closure captures when reviewing code?",
+    "answer": "I read every stored or escaping closure as a lifetime statement and ask two things: what does this keep alive, and what happens if the thing it references is gone when it runs?\n\nThe first question finds cycles. If the closure is reachable from the object it captures — stored on it, held in a cancellable set on it, registered with something the object owns — that's a loop, and the capture needs weakening.\n\nThe second question is the one reviewers skip, and it finds the subtler bug. Once you weaken the capture, you've decided that if the object dies the work doesn't happen. For a UI update that's correct and desirable. For \"flush the cache\", \"release the lock\", \"resume the continuation\" or \"call the completion handler\" it's a silent failure with no crash and nothing in the logs, which is much harder to diagnose than the leak it replaced. A continuation that never resumes is the worst version — the awaiting task hangs forever.\n\nSo the review outcome isn't always \"add `[weak self]`\". Sometimes it's \"this closure should capture strongly and this object should live until the work finishes, and the reason belongs in a comment\". Sometimes the best answer is to capture the two values it actually needs instead of the whole object, which makes both questions disappear.\n\nI also look for whether the closure needs `self` at all — a surprising number capture it for one property that could have been snapshotted.",
+    "keyPoints": [
+      "Reads captures as lifetime decisions rather than pattern-matching on syntax",
+      "Asks both what's kept alive and what happens when it's gone",
+      "Names silent no-ops — especially unresumed continuations — as the cost of weak capture",
+      "Suggests value capture as a way to remove the question entirely",
+      "Concludes that weak self is not the universal answer"
+    ],
+    "followUps": [
+      {
+        "id": "i-closure-capture-1-f1",
+        "question": "How does structured concurrency change this?",
+        "answer": "A lot, and mostly for the better. A `Task` inside an object still captures `self` strongly by default, but its lifetime is bounded and cancellable rather than open-ended, and `async let` and task groups are scoped so the capture provably ends with the scope. The remaining hazard is a long-lived `Task` stored as a property, or an unbounded `for await` loop over a stream — those are the same cycle in new clothes, and the fix is still to weaken the capture or cancel the task in `deinit`."
+      }
+    ]
+  },
+  {
+    "id": "i-async-await-1",
+    "conceptID": "async-await",
+    "categoryID": "concurrency",
+    "level": "mid",
+    "question": "What's the difference between blocking and suspending, and why does it matter?",
+    "answer": "A blocked thread is still occupied — it's sitting in a wait state, consuming a thread from a finite pool, and it can't do anything else until whatever it's waiting on completes. Suspension releases the thread entirely: the function's state is saved into a heap-allocated frame, the thread goes back to the pool for other work, and the function is resumed later.\n\nIt matters because threads are expensive and few. Swift's cooperative pool is sized to the core count, deliberately, to avoid the thread explosion that GCD allowed — where each blocked queue could spawn another thread and a busy app ended up with hundreds, each with its own stack, thrashing the scheduler. With suspension, a handful of threads can serve thousands of concurrent operations, because waiting costs a heap frame rather than a thread.\n\nThe practical consequence is the rule that you must not block inside async code. `Thread.sleep`, a semaphore wait, synchronous file or network I/O — each of those occupies a pool thread that the runtime was counting on. Do it on enough of them and you deadlock: every thread is blocked waiting for work that needs a thread to make progress.\n\nThe other consequence is that you can't assume you resume on the thread you left, so thread-local state and \"I know I'm on the main thread here\" reasoning don't survive an await. Isolation, not threads, is how you express that now.",
+    "keyPoints": [
+      "Distinguishes occupying a thread from releasing it",
+      "Explains the finite cooperative pool and why it's capped",
+      "Names concrete blocking hazards and the deadlock they cause",
+      "Notes you may resume on a different thread"
+    ],
+    "followUps": [
+      {
+        "id": "i-async-await-1-f1",
+        "question": "How does `Task.sleep` differ from `Thread.sleep`?",
+        "answer": "`Task.sleep` is async — it suspends, so the thread is released for the duration, and it's cancellation-aware, throwing `CancellationError` if the task is cancelled while waiting. `Thread.sleep` blocks the thread and ignores cancellation entirely. In async code the second one is essentially always a bug."
+      }
+    ]
+  },
+  {
+    "id": "i-actors-1",
+    "conceptID": "actors",
+    "categoryID": "concurrency",
+    "level": "senior",
+    "question": "What guarantee does an actor give you, and what does it deliberately not give you?",
+    "answer": "It guarantees exclusive access to its isolated state. Only one task executes actor code at a time, and the compiler enforces that everything outside goes through `await`, so you cannot accidentally touch that state concurrently. Low-level data races on those properties become impossible — that's a static guarantee, not a runtime hope.\n\nWhat it doesn't give you is atomicity across suspension points. Actors are reentrant: when a method awaits, the actor can start another call. So the real guarantee is that your code runs uninterrupted *between* awaits, not that a whole method is atomic. Any invariant that spans an await has to be re-established afterwards or protected explicitly — the classic symptom is a cache that checks for a miss, awaits a fetch, and ends up fetching twice because two callers both passed the check.\n\nReentrancy isn't an oversight, it's the alternative to deadlock: if the actor stayed locked across an await, an actor awaiting something that eventually calls back into it would wait on itself forever.\n\nThe other non-guarantee is ordering. Callers are resumed when the actor is free, not in the order they arrived, so you can't rely on FIFO. If you need ordering, model it — a sequence number, or an `AsyncStream` you consume in order.\n\nSo actors solve \"two threads mutating the same property\". They don't solve \"this multi-step operation must be atomic\", and conflating the two is where people get bitten.",
+    "keyPoints": [
+      "States the guarantee precisely: exclusive access, compiler-enforced",
+      "Explains reentrancy and that atomicity stops at each await",
+      "Justifies reentrancy as deadlock avoidance rather than calling it a flaw",
+      "Notes that call ordering is not guaranteed",
+      "Gives a concrete failure — the double-fetch cache"
+    ],
+    "followUps": [
+      {
+        "id": "i-actors-1-f1",
+        "question": "How would you make a multi-step actor operation effectively atomic?",
+        "answer": "Keep the whole operation free of awaits if you can — a synchronous actor method is atomic by construction. When it must await, store the in-flight work: a `[Key: Task<Value, Error>]` map so a second caller awaits the first task's result instead of starting its own. That's both correct and a deduplication win. For genuinely sequential pipelines, feed an `AsyncStream` and process it in one consuming loop, which gives you ordering as well as exclusion."
+      },
+      {
+        "id": "i-actors-1-f2",
+        "question": "When is an actor the wrong tool?",
+        "answer": "When the state is immutable — no protection needed, and you've added awaits for nothing. When contention is very high and operations are tiny, where the suspension overhead can exceed a simple lock. And when the thing you actually need is ordering or backpressure rather than mutual exclusion; that's a stream or a queue, not an actor."
+      }
+    ]
+  },
+  {
+    "id": "i-main-actor-1",
+    "conceptID": "main-actor",
+    "categoryID": "concurrency",
+    "level": "mid",
+    "question": "Why can an app freeze even though all its code is correctly on the main actor?",
+    "answer": "Because `@MainActor` is a statement about *where* code runs, not about how long it takes. Its executor is the main thread — the same thread that processes touches, runs the run loop, and commits frames to the render server. Any synchronous work on it delays all of that, and past roughly sixteen milliseconds you're dropping frames.\n\nThe confusing part is that `await` doesn't automatically help. If a main-actor function awaits another main-actor function, you suspend and resume on the same actor, and the work still happens on the main thread. The `await` makes it look asynchronous while changing nothing about who does the work. To actually get off, the awaited function has to be `nonisolated` or belong to a type that isn't main-actor bound.\n\nThe other freeze I'd look for is hop thrash: a main-actor loop that awaits non-isolated work each iteration pays a scheduling round trip every time. A thousand hops adds up, and nothing in the source looks slow. Doing the batch in one non-isolated call and returning the result costs one hop instead.\n\nSo the rule I work to is: the main actor holds UI state and applies results. Computation — parsing, decoding, image work, database queries — lives on types that aren't isolated to it.",
+    "keyPoints": [
+      "Separates isolation from performance clearly",
+      "Knows await between two main-actor functions changes nothing",
+      "Raises repeated actor hops as a distinct, hard-to-see cost",
+      "States a usable rule for what belongs on the main actor"
+    ],
+    "followUps": [
+      {
+        "id": "i-main-actor-1-f1",
+        "question": "How would you confirm it's main-thread work rather than something else?",
+        "answer": "Time Profiler in Instruments, filtered to the main thread, with the heaviest stack trace view — it points at the exact frames. The Hangs instrument and Xcode's hang detection flag the same thing in terms of user-visible stalls. In SwiftUI I'd also check whether it's actually a body being re-evaluated far too often, which looks identical from the outside but has a completely different fix."
+      }
+    ]
+  },
+  {
+    "id": "i-sendable-1",
+    "conceptID": "sendable",
+    "categoryID": "concurrency",
+    "level": "staff",
+    "question": "How does Swift's concurrency model eliminate data races, and what does it still not protect you from?",
+    "answer": "It works by dividing mutable state into isolation domains and controlling what crosses between them. Actors own their state and serialise access; `@MainActor` is the domain for UI. `Sendable` is the type-level rule for what may cross a boundary — value types of Sendable parts, immutable finals, actors, and closures whose captures are all Sendable. The compiler checks this statically, so the classic data race, two threads writing the same property with no synchronisation, becomes a compile error rather than a bug you reproduce once a fortnight.\n\nWhat survives is everything above that level. High-level race conditions — logic whose correctness depends on ordering — are untouched. The canonical example is an actor cache that checks for a miss, awaits a fetch, and stores the result: perfectly data-race free, and it'll fetch twice under concurrent callers, because reentrancy lets a second call in at the await. Ordering isn't guaranteed either; callers resume when the actor is free, not in arrival order.\n\nDeadlock is reduced rather than eliminated. Actor reentrancy removes the classic self-deadlock, but you can still block the cooperative pool — a semaphore wait or synchronous I/O inside async code occupies a thread the runtime needed, and enough of those and nothing progresses.\n\nAnd every `@unchecked Sendable` is a hole you opened deliberately. The model is only as sound as the number of those in the codebase, which is why I treat each one as needing a comment explaining the actual guarantee.\n\nSo: a whole bug class is gone, statically. Designing correct concurrent *logic* is still the engineer's job.",
+    "keyPoints": [
+      "Explains isolation domains and Sendable as the crossing rule",
+      "Distinguishes data races from race conditions with a concrete example",
+      "Knows reentrancy and ordering are not covered",
+      "Identifies pool starvation as the remaining deadlock risk",
+      "Treats @unchecked as an explicit soundness hole"
+    ],
+    "followUps": [
+      {
+        "id": "i-sendable-1-f1",
+        "question": "How would you migrate a large Swift 5 codebase toward this?",
+        "answer": "Incrementally, module by module. Turn on strict concurrency checking at `minimal`, then `targeted`, then `complete`, fixing warnings at each step rather than flipping to Swift 6 language mode and drowning. Start at the leaves — model types are usually already structs and just need the conformance stated. Annotate UI types `@MainActor` early, since that resolves a large fraction of the warnings at once. Save the shared mutable singletons for last; they're where the real design work is, and they're often where an actor genuinely belongs."
+      },
+      {
+        "id": "i-sendable-1-f2",
+        "question": "When would you still reach for a lock over an actor?",
+        "answer": "When the critical section is tiny and extremely hot, where suspension overhead would dominate. When I need synchronous access from a non-async context and making the API async would infect a large call tree. And when bridging to code that isn't async at all. In those cases it's an `@unchecked Sendable` type wrapping an `NSLock` or `OSAllocatedUnfairLock`, kept small and thoroughly commented — the exception, not the pattern."
+      }
+    ]
+  },
+  {
+    "id": "i-vc-lifecycle-1",
+    "conceptID": "vc-lifecycle",
+    "categoryID": "uikit",
+    "level": "junior",
+    "question": "What's the difference between `viewDidLoad` and `viewWillAppear`, and how do you decide which to use?",
+    "answer": "`viewDidLoad` runs exactly once per instance, right after the view hierarchy is created. `viewWillAppear` runs every time the view is about to go on screen — including when you come back from a screen you pushed.\n\nSo the split is one-time construction versus repeated refresh. Adding subviews, activating constraints, setting fonts and colours, wiring up targets: all `viewDidLoad`, because doing it again would duplicate work and can duplicate subviews. Anything that could have changed while the screen was away goes in `viewWillAppear` — re-reading a model, updating a badge, restoring navigation bar state, reflecting a setting the user changed two screens deep.\n\nThe bug you get from mixing them up is very recognisable: put a data refresh in `viewDidLoad` and everything looks right on first launch, then the user edits something on a detail screen, comes back, and the list still shows the old value.\n\nFor work that should start only once the transition is actually finished — animations, screen-view analytics, becoming first responder — I'd use `viewDidAppear`, since the view is genuinely on screen by then.",
+    "keyPoints": [
+      "States once-per-instance versus every-appearance clearly",
+      "Assigns construction to viewDidLoad and refresh to viewWillAppear",
+      "Names the stale-data bug that results from confusing them",
+      "Knows viewDidAppear is for post-transition work"
+    ],
+    "followUps": [
+      {
+        "id": "i-vc-lifecycle-1-f1",
+        "question": "Why might a view controller's `viewDidLoad` never run?",
+        "answer": "Because the view was never accessed. `view` is lazy, so a controller that's created but never presented, and whose view nobody touches, never loads. It also means the reverse surprise: reading `.view` from outside to configure something loads it right then, earlier than you expected."
+      }
+    ]
+  },
+  {
+    "id": "i-responder-chain-1",
+    "conceptID": "responder-chain",
+    "categoryID": "uikit",
+    "level": "mid",
+    "question": "Walk me through what happens between a finger touching the glass and your action method running.",
+    "answer": "Two passes, in opposite directions.\n\nFirst, hit testing, going down. UIKit calls `hitTest(_:with:)` on the window, which asks `point(inside:with:)` and then recurses into subviews back-to-front, returning the deepest view that contains the point. Views that are hidden, have user interaction disabled, or have alpha at or below 0.01 are skipped entirely. The result is the view the touch is delivered to.\n\nThen the responder chain, going up. If that view doesn't handle the event, it goes to its next responder — normally the superview, then the view controller at the top of its hierarchy, then the parent or presenting controller, then the window, the application, and finally the app delegate. The first responder that implements the action handles it and the walk stops. If nobody does, the event is silently discarded.\n\nFor a target-action button with an explicit target, the walk is skipped — it goes straight there. The chain matters when the target is `nil`, which is how the system edit menu and the keyboard-dismissal trick work without knowing which field is focused.\n\nThe bug this explains most often is a button outside its parent's bounds: it's visible because the parent doesn't clip, but untappable because hit testing rejected the point at the parent before it ever looked at the button.",
+    "keyPoints": [
+      "Separates the downward hit-test pass from the upward responder walk",
+      "Knows the skip conditions: hidden, interaction disabled, low alpha",
+      "Describes the chain beyond the view hierarchy — controller, window, app",
+      "Notes unhandled events are discarded silently",
+      "Applies it to a real bug"
+    ],
+    "followUps": [
+      {
+        "id": "i-responder-chain-1-f1",
+        "question": "How would you make a button outside its parent's bounds tappable?",
+        "answer": "Override `point(inside:with:)` on the parent to also return true for points inside the button's frame, so hit testing recurses. Enlarging the parent or restructuring the hierarchy is usually cleaner if you can — the override is easy to forget about when someone later changes the layout."
+      }
+    ]
+  },
+  {
+    "id": "i-state-1",
+    "conceptID": "state",
+    "categoryID": "swiftui",
+    "level": "mid",
+    "question": "Why does SwiftUI use structs for views when they're recreated so often?",
+    "answer": "Because recreation is cheap and the alternative isn't. A struct is a value with no heap allocation and no reference counting — creating one is close to free, so SwiftUI can afford to build a fresh description of the UI on every change and diff it against the previous one. That's what makes the declarative model viable: `body` is a pure function from state to description, and the framework works out the minimal set of actual changes.\n\nWith classes you'd pay heap allocation and ARC traffic for every view on every update, and you'd have identity where you don't want it — two views describing the same thing would be different objects, so diffing would be harder rather than easier.\n\nThe consequence is that views can't hold their own memory, since the struct is thrown away. That's what `@State` is for: storage the framework keeps outside the struct, keyed by the view's identity in the hierarchy, with the wrapper holding a reference into it.\n\nIdentity then becomes the thing you have to be deliberate about. SwiftUI decides which storage belongs to which view by structural position or explicit `.id()`, so moving a view between branches of an `if`, or changing its id, gives it fresh state. Most of the \"my state reset itself\" bugs are identity changes nobody intended.",
+    "keyPoints": [
+      "Explains cheapness of value types as the enabler for diffing",
+      "Frames body as a pure function from state to description",
+      "Connects struct disposability to why @State exists",
+      "Raises view identity as the thing that decides storage"
+    ],
+    "followUps": [
+      {
+        "id": "i-state-1-f1",
+        "question": "When would you use `@State` versus a reference type marked `@Observable`?",
+        "answer": "`@State` for state this one view owns and no one else needs — a toggle, a selected tab, whether a sheet is showing. An `@Observable` model when the state is shared across views, has behaviour attached, or outlives a single screen. The two combine: you hold the model in `@State` in the view that owns its lifetime, and pass it down either directly or through the environment."
+      }
+    ]
+  },
+  {
+    "id": "i-binding-1",
+    "conceptID": "binding",
+    "categoryID": "swiftui",
+    "level": "junior",
+    "question": "When should a child view take a `Binding` rather than a plain value?",
+    "answer": "When the child needs to write. A plain value is a one-way snapshot — the child can display it and nothing more. A `Binding` is a getter and setter pointing back at the owner's storage, so writes propagate.\n\nThe way I decide is by asking who owns the state. It should live with the view that's responsible for it — usually the highest view that cares — as `@State`. Anything below that either reads it, in which case a `let` is better because it documents that the child can't change anything, or writes it, in which case `@Binding` and pass `$`.\n\nGetting this wrong produces a very characteristic bug: a toggle or text field that appears to work, animates correctly, and has no effect. There's no error, because passing a value where you meant a binding compiles fine — the child just ends up mutating its own copy.\n\nThe other reason to prefer `let` where you can is that it keeps the data flow readable. If every child takes a binding, you can't tell from a signature which ones actually mutate.",
+    "keyPoints": [
+      "Ties the choice to whether the child writes",
+      "Places ownership at the highest view that cares",
+      "Prefers let for read-only children, and says why",
+      "Names the silent no-effect bug that results from getting it wrong"
+    ],
+    "followUps": [
+      {
+        "id": "i-binding-1-f1",
+        "question": "How do you give a preview a binding without real state?",
+        "answer": "`.constant(value)` — a binding whose setter discards writes. It renders the view correctly for the static case. If the preview needs the control to actually respond, wrap it in a small container view holding real `@State`, or use `@Previewable @State` so the macro sets it up for you."
+      }
+    ]
+  },
+  {
+    "id": "i-observation-1",
+    "conceptID": "observation",
+    "categoryID": "swiftui",
+    "level": "senior",
+    "question": "How does SwiftUI know which views to re-render when an `@Observable` model changes?",
+    "answer": "It records dependencies by observing what each view actually reads. SwiftUI evaluates `body` inside `withObservationTracking`, and the macro has rewritten every stored property into a computed one that reports reads to an `ObservationRegistrar`. So by the end of evaluating a body, the framework has an exact set of properties that view depends on. Mutating one goes through `withMutation`, which notifies precisely the views that read it.\n\nThe contrast with `ObservableObject` is the granularity. There, any `@Published` write fires a single `objectWillChange` on the whole object, so every view observing it re-renders whether or not the change was relevant. In a screen with one model and twenty views, that's nineteen wasted body evaluations per keystroke. Observation makes that a non-issue without anyone hand-splitting models to work around it.\n\nTwo details I'd flag. Tracking is scoped to body evaluation, so a read in a button's action closure isn't a dependency — which is normally what you want. And granularity is per property, not per element: if a body reads an array, appending to it invalidates that view even if it only rendered one element. Fine-grained models don't help there; you need the view structure to match, typically by putting a `ForEach` row in its own view that reads only its element.\n\nThe practical upshot is that most gratuitous re-render problems go away, and the ones left are about view decomposition rather than about observation.",
+    "keyPoints": [
+      "Explains withObservationTracking and the registrar accurately",
+      "Quantifies the improvement over objectWillChange",
+      "Knows tracking is scoped to body evaluation, not closures",
+      "Raises collection granularity as the remaining sharp edge",
+      "Connects the fix to view decomposition"
+    ],
+    "followUps": [
+      {
+        "id": "i-observation-1-f1",
+        "question": "How do you get a `Binding` out of an `@Observable` model?",
+        "answer": "`@Bindable`. It projects bindings for the model's properties, so `$model.name` works in a `TextField`. You can declare it as a property, or inline in a body with `@Bindable var model = model` when you only need it in one place. Plain `@State` on the model also projects bindings, but only in the view that owns it."
+      },
+      {
+        "id": "i-observation-1-f2",
+        "question": "When would you still reach for `ObservableObject`?",
+        "answer": "Mainly for deployment targets below iOS 17, or when interoperating with existing Combine pipelines where you want `objectWillChange` as a publisher. For new code on current targets there's no reason — `@Observable` is less boilerplate and strictly better at invalidation."
+      }
+    ]
+  }
+]

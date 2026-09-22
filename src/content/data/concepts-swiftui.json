@@ -1,0 +1,463 @@
+[
+  {
+    "id": "state",
+    "title": "State",
+    "subtitle": "Where a SwiftUI view keeps memory that survives its own recreation.",
+    "categoryID": "swiftui",
+    "difficulty": "beginner",
+    "estimatedMinutes": 8,
+    "tags": [
+      "swiftui",
+      "state",
+      "identity",
+      "rendering"
+    ],
+    "sections": [
+      {
+        "type": "explanation",
+        "body": "A SwiftUI view is a struct. It's created, its `body` is read, and it's thrown away — constantly, many times a second during an animation. So a plain `var` in a view is useless as memory: the next recreation resets it.\n\n`@State` solves that by keeping the value *outside* the struct. SwiftUI allocates storage attached to the view's position in the hierarchy, and the property wrapper reads and writes that storage. The struct comes and goes; the state stays.\n\nWriting to it also tells SwiftUI the view is invalid, so `body` is re-read and the UI updates. That's the whole loop: state changes, body re-runs, the framework diffs the result.",
+        "id": "state-s1"
+      },
+      {
+        "type": "analogy",
+        "body": "A view struct is a recipe, not a cake.\n\nSwiftUI reads the recipe whenever it needs to know what the cake should look like, and the recipe itself is disposable — you can print a fresh copy any time.\n\n`@State` is the pantry. It isn't part of the recipe, it's the ingredients kept in the kitchen, and it survives printing a new copy of the recipe. Which shelf your ingredients sit on is determined by where in the kitchen you are — that's view identity, and it's why moving a view can lose its state.",
+        "id": "state-s2"
+      },
+      {
+        "type": "code",
+        "caption": "`@State` is owned by one view. `$` projects a Binding for children to write through.",
+        "code": "struct Counter: View {\n    @State private var count = 0        // storage lives outside the struct\n    var plain = 0                       // reset on every recreation — not memory\n\n    var body: some View {\n        VStack {\n            Text(\"Count: \\(count)\")\n            Button(\"Increment\") { count += 1 }   // triggers a body re-read\n        }\n    }\n}\n\n// @State should be private and owned by this view.\n// To hand write access to a child, pass a Binding:\nstruct Parent: View {\n    @State private var isOn = false\n    var body: some View { Toggle(\"On\", isOn: $isOn) }   // $ makes a Binding\n}",
+        "id": "state-s3"
+      },
+      {
+        "type": "diagram",
+        "title": "State survives view recreation",
+        "altText": "A view struct is created and discarded repeatedly, while its State storage persists outside, attached to the view's identity in the hierarchy.",
+        "nodes": [
+          {
+            "id": "v1",
+            "label": "Counter struct",
+            "detail": "created",
+            "x": 0.2,
+            "y": 0.2,
+            "style": "view"
+          },
+          {
+            "id": "v2",
+            "label": "Counter struct",
+            "detail": "recreated",
+            "x": 0.2,
+            "y": 0.8,
+            "style": "view"
+          },
+          {
+            "id": "storage",
+            "label": "@State storage",
+            "detail": "count = 3",
+            "x": 0.62,
+            "y": 0.5,
+            "style": "object"
+          },
+          {
+            "id": "identity",
+            "label": "View identity",
+            "detail": "position in hierarchy",
+            "x": 0.9,
+            "y": 0.5,
+            "style": "note"
+          }
+        ],
+        "edges": [
+          {
+            "id": "r1",
+            "from": "v1",
+            "to": "storage",
+            "label": "reads/writes",
+            "style": "flow"
+          },
+          {
+            "id": "r2",
+            "from": "v2",
+            "to": "storage",
+            "label": "same storage",
+            "style": "flow"
+          },
+          {
+            "id": "id",
+            "from": "storage",
+            "to": "identity",
+            "label": "keyed by",
+            "style": "strong"
+          }
+        ],
+        "steps": [
+          {
+            "id": "s1",
+            "caption": "The struct is created and its body read.",
+            "nodeIDs": [
+              "v1",
+              "storage"
+            ],
+            "edgeIDs": [
+              "r1"
+            ]
+          },
+          {
+            "id": "s2",
+            "caption": "It's discarded and recreated — but the storage is untouched.",
+            "nodeIDs": [
+              "v2",
+              "storage"
+            ],
+            "edgeIDs": [
+              "r2"
+            ]
+          },
+          {
+            "id": "s3",
+            "caption": "SwiftUI finds the right storage by view identity. Change the identity and you get fresh state.",
+            "nodeIDs": [
+              "storage",
+              "identity"
+            ],
+            "edgeIDs": [
+              "id"
+            ]
+          }
+        ],
+        "id": "state-s4"
+      },
+      {
+        "type": "underTheHood",
+        "body": "`@State` is a property wrapper holding a *reference* to storage SwiftUI manages, keyed by the view's identity — its type and position in the hierarchy, or its `id` if you gave it one. That indirection is why a `let` view struct can still mutate `count`: the struct isn't changing, the box it points at is.\n\nIdentity is the part that produces surprises. Change a view's identity — with a different `.id()`, by moving it between branches of an `if`, or by changing an element's identity in a `ForEach` — and SwiftUI treats it as a new view and gives it *fresh* state. That's the mechanism behind both \"my state mysteriously reset\" and the deliberate trick of `.id(someValue)` to force a reset.\n\nThe initial value is only used the first time. On later recreations the existing storage wins, so passing a constructor argument into a `@State` initial value doesn't update it when the argument changes — a genuinely common bug.\n\n`@State` is also the reason `body` must stay cheap: any write re-reads it.",
+        "id": "state-s5"
+      },
+      {
+        "type": "callout",
+        "style": "mistake",
+        "title": "Initialising @State from a parameter",
+        "body": "`@State private var name: String` initialised from an `init` parameter takes that value *once*. When the parent re-renders with a different value, the state keeps the old one, because storage already exists and the initial value is ignored.\n\nIf the parent owns the value, pass a `Binding` instead. If the child should reset when the input changes, give the child `.id(input)` so it gets a new identity, and with it fresh state.",
+        "id": "state-s6"
+      },
+      {
+        "type": "quickCheck",
+        "refID": "q-state-1",
+        "id": "state-s7"
+      },
+      {
+        "type": "interview",
+        "refID": "i-state-1",
+        "id": "state-s8"
+      },
+      {
+        "type": "trivia",
+        "refID": "t-state-1",
+        "id": "state-s9"
+      },
+      {
+        "type": "keyTakeaway",
+        "body": "View structs are disposable; `@State` is storage SwiftUI keeps alongside them, keyed by view identity. Own state where it belongs, keep it private, and remember that changing identity resets it.",
+        "id": "state-s10"
+      }
+    ],
+    "quizIDs": [
+      "q-state-1",
+      "q-state-2",
+      "q-state-3"
+    ],
+    "triviaIDs": [
+      "t-state-1",
+      "t-state-2"
+    ],
+    "interviewQuestionIDs": [
+      "i-state-1"
+    ],
+    "relatedConceptIDs": [
+      "binding",
+      "observation",
+      "struct-vs-class"
+    ],
+    "prerequisiteIDs": [
+      "struct-vs-class"
+    ]
+  },
+  {
+    "id": "binding",
+    "title": "Binding",
+    "subtitle": "A read-write reference to state that lives somewhere else.",
+    "categoryID": "swiftui",
+    "difficulty": "beginner",
+    "estimatedMinutes": 6,
+    "tags": [
+      "swiftui",
+      "binding",
+      "state",
+      "data flow"
+    ],
+    "sections": [
+      {
+        "type": "explanation",
+        "body": "A `Binding` is a two-way connection to a value owned by another view. It doesn't store anything — it's a pair of closures, a getter and a setter, pointing at somebody else's storage.\n\nThat's what lets a child mutate a parent's state without owning it, and without the parent passing down a callback for every field. `TextField`, `Toggle` and `Slider` all take one, which is why they can write back the value you handed them.\n\nYou make one with the `$` prefix on a `@State` property. Data flows down as a value, changes flow back up through the setter.",
+        "id": "binding-s1"
+      },
+      {
+        "type": "analogy",
+        "body": "A binding is a remote control, not a television.\n\nHanding someone the remote lets them change the channel on your TV. They don't own the TV, they can't take it home, and there's still only one of it — but they can operate it from where they are.\n\nPassing a plain value instead would be like handing them a photograph of the screen. They can look at it, and nothing they do affects what's actually on.",
+        "id": "binding-s2"
+      },
+      {
+        "type": "code",
+        "caption": "`@Binding` declares the dependency; `$` creates one to pass on.",
+        "code": "struct ParentView: View {\n    @State private var isOn = false      // owns the storage\n\n    var body: some View {\n        VStack {\n            SettingRow(title: \"Notifications\", isOn: $isOn)   // $ projects a Binding\n            Text(isOn ? \"On\" : \"Off\")                         // parent sees the change\n        }\n    }\n}\n\nstruct SettingRow: View {\n    let title: String\n    @Binding var isOn: Bool              // no storage — a window onto the parent's\n\n    var body: some View {\n        Toggle(title, isOn: $isOn)       // $ again, to pass it further down\n    }\n}\n\n// A derived binding: transform on the way in and out\nextension Binding where Value == String {\n    var trimmed: Binding<String> {\n        Binding(get: { wrappedValue.trimmingCharacters(in: .whitespaces) },\n                set: { wrappedValue = $0 })\n    }\n}\n\n// Previews and tests don't need real state\nSettingRow(title: \"Preview\", isOn: .constant(true))",
+        "id": "binding-s3"
+      },
+      {
+        "type": "underTheHood",
+        "body": "`Binding` is a struct holding a `get` closure and a `set` closure. There's no storage in it at all, which is why passing one around is cheap and why a binding to a deallocated source is a real hazard rather than an impossible state.\n\nThe `$` prefix is the property wrapper's *projected value*: `@State` exposes `projectedValue` of type `Binding<Value>`, and `$count` is sugar for `_count.projectedValue`. Any property wrapper can project something; `@State`, `@Binding`, `@Bindable` and `@FocusState` all project bindings.\n\nBecause it's just closures, you can build one by hand with `Binding(get:set:)` — useful for deriving a transformed binding, bridging to a non-SwiftUI model, or adapting an optional. `.constant(_)` is the same thing with a setter that discards, which is what previews want.",
+        "id": "binding-s4"
+      },
+      {
+        "type": "callout",
+        "style": "mistake",
+        "title": "Passing a value where a binding was needed",
+        "body": "`SettingRow(isOn: isOn)` compiles if the property is a plain `Bool`, and the row will display correctly — but the toggle's changes go nowhere and the parent never updates. It looks like a broken control rather than a data-flow mistake.\n\nThe rule is simple: if the child needs to *write*, it takes `@Binding` and you pass `$`. If it only displays, a plain `let` is better — it documents that the child can't change anything.",
+        "id": "binding-s5"
+      },
+      {
+        "type": "quickCheck",
+        "refID": "q-binding-1",
+        "id": "binding-s6"
+      },
+      {
+        "type": "interview",
+        "refID": "i-binding-1",
+        "id": "binding-s7"
+      },
+      {
+        "type": "trivia",
+        "refID": "t-binding-1",
+        "id": "binding-s8"
+      },
+      {
+        "type": "keyTakeaway",
+        "body": "A binding is a getter/setter pair pointing at someone else's storage. Pass `$` when the child must write, and a plain value when it only reads.",
+        "id": "binding-s9"
+      }
+    ],
+    "quizIDs": [
+      "q-binding-1",
+      "q-binding-2",
+      "q-binding-3"
+    ],
+    "triviaIDs": [
+      "t-binding-1",
+      "t-binding-2"
+    ],
+    "interviewQuestionIDs": [
+      "i-binding-1"
+    ],
+    "relatedConceptIDs": [
+      "state",
+      "observation"
+    ],
+    "prerequisiteIDs": [
+      "state"
+    ]
+  },
+  {
+    "id": "observation",
+    "title": "Observation",
+    "subtitle": "@Observable, and how SwiftUI learns which views depend on which properties.",
+    "categoryID": "swiftui",
+    "difficulty": "advanced",
+    "estimatedMinutes": 8,
+    "tags": [
+      "swiftui",
+      "observable",
+      "observation",
+      "performance"
+    ],
+    "sections": [
+      {
+        "type": "explanation",
+        "body": "`@Observable` is a macro that makes a reference type's properties trackable. A SwiftUI view that reads one of those properties in `body` is automatically re-rendered when *that property* changes — and not when others do.\n\nThat per-property precision is the whole improvement over `ObservableObject`. With `@Published`, any change fired `objectWillChange`, so every observing view re-rendered regardless of what it actually read. With Observation, a view reading only `name` doesn't care that `progress` changed.\n\nIt also removes the property-wrapper bookkeeping. No `@Published` on each property, and in a view you use plain `let`, or `@State` when the view owns the model's lifetime.",
+        "id": "observation-s1"
+      },
+      {
+        "type": "analogy",
+        "body": "`ObservableObject` was a building fire alarm. Anything happens anywhere and everybody evacuates, whether or not it concerned them.\n\n`@Observable` is a per-desk notification. You subscribed to the printer queue, so you hear about the printer — the fact that someone changed the thermostat doesn't reach you at all.\n\nYou didn't fill in a subscription form either. The system noticed what you looked at.",
+        "id": "observation-s2"
+      },
+      {
+        "type": "code",
+        "caption": "`@State` to own the model, plain `let` to pass it, `@Bindable` when you need `$`.",
+        "code": "@Observable\nfinal class ProfileModel {\n    var name = \"\"            // no @Published needed\n    var progress = 0.0\n    private(set) var loadCount = 0\n\n    func reload() { loadCount += 1 }\n}\n\nstruct NameView: View {\n    let model: ProfileModel          // plain let — tracking is automatic\n\n    // reads `name` only, so a change to `progress` does not re-render this\n    var body: some View { Text(model.name) }\n}\n\nstruct OwnerView: View {\n    @State private var model = ProfileModel()   // this view owns the lifetime\n\n    var body: some View {\n        VStack {\n            NameView(model: model)\n            // @Bindable projects bindings from an @Observable model\n            @Bindable var model = model\n            TextField(\"Name\", text: $model.name)\n        }\n    }\n}",
+        "id": "observation-s3"
+      },
+      {
+        "type": "diagram",
+        "title": "Per-property dependency tracking",
+        "altText": "Two views read different properties of one Observable model. Changing one property re-renders only the view that read it.",
+        "nodes": [
+          {
+            "id": "model",
+            "label": "ProfileModel",
+            "detail": "@Observable",
+            "x": 0.5,
+            "y": 0.12,
+            "style": "object"
+          },
+          {
+            "id": "pname",
+            "label": "name",
+            "detail": "changed",
+            "x": 0.24,
+            "y": 0.45,
+            "style": "note"
+          },
+          {
+            "id": "pprog",
+            "label": "progress",
+            "detail": "unchanged",
+            "x": 0.76,
+            "y": 0.45,
+            "style": "note"
+          },
+          {
+            "id": "vname",
+            "label": "NameView",
+            "detail": "re-renders",
+            "x": 0.24,
+            "y": 0.85,
+            "style": "view"
+          },
+          {
+            "id": "vprog",
+            "label": "ProgressView",
+            "detail": "untouched",
+            "x": 0.76,
+            "y": 0.85,
+            "style": "view"
+          }
+        ],
+        "edges": [
+          {
+            "id": "m1",
+            "from": "model",
+            "to": "pname",
+            "style": "flow"
+          },
+          {
+            "id": "m2",
+            "from": "model",
+            "to": "pprog",
+            "style": "flow"
+          },
+          {
+            "id": "t1",
+            "from": "pname",
+            "to": "vname",
+            "label": "tracked read",
+            "style": "strong"
+          },
+          {
+            "id": "t2",
+            "from": "pprog",
+            "to": "vprog",
+            "label": "tracked read",
+            "style": "dashed"
+          }
+        ],
+        "steps": [
+          {
+            "id": "s1",
+            "caption": "Each view's body reads specific properties, and the framework records which.",
+            "nodeIDs": [
+              "model",
+              "pname",
+              "pprog"
+            ],
+            "edgeIDs": [
+              "m1",
+              "m2"
+            ]
+          },
+          {
+            "id": "s2",
+            "caption": "Only `name` changes.",
+            "nodeIDs": [
+              "pname"
+            ],
+            "edgeIDs": []
+          },
+          {
+            "id": "s3",
+            "caption": "Only the view that read `name` is invalidated. The other doesn't re-render.",
+            "nodeIDs": [
+              "vname",
+              "vprog"
+            ],
+            "edgeIDs": [
+              "t1",
+              "t2"
+            ]
+          }
+        ],
+        "id": "observation-s4"
+      },
+      {
+        "type": "underTheHood",
+        "body": "The macro rewrites each stored property into a computed one that calls `access(keyPath:)` on read and `withMutation(keyPath:)` on write, backed by an `ObservationRegistrar`.\n\nSwiftUI evaluates `body` inside `withObservationTracking`, so every property accessed during that evaluation is recorded as a dependency of that view. When one of those properties is mutated, the registrar notifies exactly the views that read it.\n\nTwo consequences worth internalising. First, tracking is per *access during body*, so a property read in a method you call from `body` is still tracked, while one read in a button's action closure is not — that closure isn't part of body evaluation. Second, reading a whole collection tracks the collection, so appending to an array re-renders everything that read it, no matter how granular the model looks.\n\nIt's also not SwiftUI-specific: `withObservationTracking` is in the Observation module and usable from plain Swift.",
+        "id": "observation-s5"
+      },
+      {
+        "type": "callout",
+        "style": "mistake",
+        "title": "Storing an @Observable model in @State in the wrong view",
+        "body": "`@State private var model = Model()` creates the model once and ties its lifetime to *that view's identity*. Put it in a view that gets recreated with a new identity and the model is rebuilt, silently losing everything in it.\n\nOwn the model at the level whose lifetime should match it, and pass it down as a plain `let` or through the environment. Passing it down doesn't weaken tracking — that works regardless of how the reference arrived.",
+        "id": "observation-s6"
+      },
+      {
+        "type": "quickCheck",
+        "refID": "q-observation-1",
+        "id": "observation-s7"
+      },
+      {
+        "type": "interview",
+        "refID": "i-observation-1",
+        "id": "observation-s8"
+      },
+      {
+        "type": "trivia",
+        "refID": "t-observation-1",
+        "id": "observation-s9"
+      },
+      {
+        "type": "keyTakeaway",
+        "body": "`@Observable` tracks reads at property granularity during body evaluation, so only views that actually read a property re-render when it changes. Own the model where its lifetime belongs, and pass it down plainly.",
+        "id": "observation-s10"
+      }
+    ],
+    "quizIDs": [
+      "q-observation-1",
+      "q-observation-2",
+      "q-observation-3"
+    ],
+    "triviaIDs": [
+      "t-observation-1",
+      "t-observation-2"
+    ],
+    "interviewQuestionIDs": [
+      "i-observation-1"
+    ],
+    "relatedConceptIDs": [
+      "state",
+      "binding",
+      "protocols"
+    ],
+    "prerequisiteIDs": [
+      "state",
+      "binding"
+    ]
+  }
+]

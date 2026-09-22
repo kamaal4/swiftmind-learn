@@ -1,0 +1,460 @@
+[
+  {
+    "id": "vc-lifecycle",
+    "title": "UIViewController Lifecycle",
+    "subtitle": "Which callback fires when, and what work belongs in each one.",
+    "categoryID": "uikit",
+    "difficulty": "beginner",
+    "estimatedMinutes": 8,
+    "tags": [
+      "uikit",
+      "lifecycle",
+      "viewcontroller",
+      "appearance"
+    ],
+    "sections": [
+      {
+        "type": "explanation",
+        "body": "A view controller's lifecycle splits into two groups, and keeping them straight is most of the battle.\n\n**Loading** happens once. `loadView` creates the view, `viewDidLoad` runs immediately after — one time, ever, for that instance.\n\n**Appearance** happens every time. `viewWillAppear`, `viewDidAppear`, `viewWillDisappear`, `viewDidDisappear` fire on each transition on and off screen. Push a detail screen and come back, and the appearance callbacks run again while `viewDidLoad` does not.\n\n**Layout** sits in between: `viewWillLayoutSubviews` and `viewDidLayoutSubviews` can run many times, whenever bounds change — rotation, keyboard, split view.",
+        "id": "vc-lifecycle-s1"
+      },
+      {
+        "type": "analogy",
+        "body": "Think of a shop unit.\n\n`viewDidLoad` is the fit-out: shelves installed, wiring done, signage up. It happens once when you take the lease.\n\n`viewWillAppear` is unlocking the doors each morning — restock, check today's prices, flip the sign. Every single day, because things changed overnight.\n\nDoing the fit-out every morning is wasteful. Checking today's prices only at fit-out means you're showing last month's.",
+        "id": "vc-lifecycle-s2"
+      },
+      {
+        "type": "code",
+        "caption": "`super` first on the way in. Frame-dependent work belongs in layout, not viewDidLoad.",
+        "code": "final class DetailViewController: UIViewController {\n\n    override func viewDidLoad() {\n        super.viewDidLoad()\n        // Once. Build the hierarchy, set constraints, configure fonts and colours.\n        view.addSubview(titleLabel)\n        NSLayoutConstraint.activate(constraints)\n    }\n\n    override func viewWillAppear(_ animated: Bool) {\n        super.viewWillAppear(animated)\n        // Every appearance. Refresh anything that may have changed while away.\n        titleLabel.text = store.currentTitle\n        navigationController?.setNavigationBarHidden(false, animated: animated)\n    }\n\n    override func viewDidAppear(_ animated: Bool) {\n        super.viewDidAppear(animated)\n        // Transition is finished: safe to start animations, log the screen view,\n        // or become first responder.\n        analytics.screenViewed(\"detail\")\n    }\n\n    override func viewDidLayoutSubviews() {\n        super.viewDidLayoutSubviews()\n        // Bounds are final — set anything that depends on actual size.\n        gradientLayer.frame = header.bounds\n    }\n}",
+        "id": "vc-lifecycle-s3"
+      },
+      {
+        "type": "diagram",
+        "title": "The lifecycle path",
+        "altText": "A view controller loads once through viewDidLoad, then cycles repeatedly through viewWillAppear, viewDidAppear, viewWillDisappear and viewDidDisappear as it moves on and off screen.",
+        "nodes": [
+          {
+            "id": "init",
+            "label": "init",
+            "detail": "once",
+            "x": 0.08,
+            "y": 0.5,
+            "style": "note"
+          },
+          {
+            "id": "load",
+            "label": "viewDidLoad",
+            "detail": "once, ever",
+            "x": 0.27,
+            "y": 0.5,
+            "style": "view"
+          },
+          {
+            "id": "willA",
+            "label": "viewWillAppear",
+            "detail": "every time",
+            "x": 0.47,
+            "y": 0.22,
+            "style": "view"
+          },
+          {
+            "id": "didA",
+            "label": "viewDidAppear",
+            "detail": "on screen",
+            "x": 0.68,
+            "y": 0.22,
+            "style": "view"
+          },
+          {
+            "id": "willD",
+            "label": "viewWillDisappear",
+            "detail": "leaving",
+            "x": 0.68,
+            "y": 0.78,
+            "style": "view"
+          },
+          {
+            "id": "didD",
+            "label": "viewDidDisappear",
+            "detail": "off screen",
+            "x": 0.47,
+            "y": 0.78,
+            "style": "view"
+          },
+          {
+            "id": "layout",
+            "label": "viewDidLayoutSubviews",
+            "detail": "many times",
+            "x": 0.92,
+            "y": 0.5,
+            "style": "note"
+          }
+        ],
+        "edges": [
+          {
+            "id": "e1",
+            "from": "init",
+            "to": "load",
+            "style": "flow"
+          },
+          {
+            "id": "e2",
+            "from": "load",
+            "to": "willA",
+            "style": "flow"
+          },
+          {
+            "id": "e3",
+            "from": "willA",
+            "to": "didA",
+            "style": "flow"
+          },
+          {
+            "id": "e4",
+            "from": "didA",
+            "to": "willD",
+            "label": "navigating away",
+            "style": "flow"
+          },
+          {
+            "id": "e5",
+            "from": "willD",
+            "to": "didD",
+            "style": "flow"
+          },
+          {
+            "id": "e6",
+            "from": "didD",
+            "to": "willA",
+            "label": "coming back",
+            "style": "dashed"
+          },
+          {
+            "id": "e7",
+            "from": "didA",
+            "to": "layout",
+            "label": "on bounds change",
+            "style": "dashed"
+          }
+        ],
+        "steps": [
+          {
+            "id": "s1",
+            "caption": "Loading runs exactly once — build the hierarchy here.",
+            "nodeIDs": [
+              "init",
+              "load"
+            ],
+            "edgeIDs": [
+              "e1"
+            ]
+          },
+          {
+            "id": "s2",
+            "caption": "Appearance callbacks run on every transition on screen.",
+            "nodeIDs": [
+              "willA",
+              "didA"
+            ],
+            "edgeIDs": [
+              "e2",
+              "e3"
+            ]
+          },
+          {
+            "id": "s3",
+            "caption": "Navigating away and back re-runs the appearance pair, never viewDidLoad.",
+            "nodeIDs": [
+              "willD",
+              "didD",
+              "willA"
+            ],
+            "edgeIDs": [
+              "e4",
+              "e5",
+              "e6"
+            ]
+          },
+          {
+            "id": "s4",
+            "caption": "Layout can fire many times as bounds change — rotation, keyboard, split view.",
+            "nodeIDs": [
+              "layout"
+            ],
+            "edgeIDs": [
+              "e7"
+            ]
+          }
+        ],
+        "id": "vc-lifecycle-s4"
+      },
+      {
+        "type": "underTheHood",
+        "body": "`view` is a lazy property. Touching it anywhere — including `someVC.view.backgroundColor = .red` from outside — forces `loadView` and then `viewDidLoad` immediately, whether or not the controller is going on screen. That's the cause of the classic bug where `viewDidLoad` fires far earlier than expected because something read `view` while configuring.\n\nAppearance callbacks are driven by the containing controller, so a custom container that forgets `addChild`/`didMove(toParent:)` will silently never forward them, and the child's `viewWillAppear` never runs.\n\n`viewDidLayoutSubviews` can fire many times per transition. It is not the place for expensive work or for anything that itself triggers layout — that's how you get a loop.\n\n`deinit` won't run if the controller is in a retain cycle, so cleanup you put there — invalidating a timer, removing an observer — silently never happens. That's why the safer home for teardown is `viewDidDisappear`.",
+        "id": "vc-lifecycle-s5"
+      },
+      {
+        "type": "callout",
+        "style": "mistake",
+        "title": "Reading view.frame in viewDidLoad",
+        "body": "At `viewDidLoad` the view exists but hasn't been laid out. Its frame is whatever came from the nib or the initial size, not what the user will see — often wrong on a different device size, in landscape, or in a split view.\n\nAnything depending on final geometry — a gradient layer's frame, a corner radius from height, a scroll view's content inset — belongs in `viewDidLayoutSubviews`, which runs once bounds are settled.",
+        "id": "vc-lifecycle-s6"
+      },
+      {
+        "type": "quickCheck",
+        "refID": "q-vc-lifecycle-1",
+        "id": "vc-lifecycle-s7"
+      },
+      {
+        "type": "interview",
+        "refID": "i-vc-lifecycle-1",
+        "id": "vc-lifecycle-s8"
+      },
+      {
+        "type": "trivia",
+        "refID": "t-vc-lifecycle-1",
+        "id": "vc-lifecycle-s9"
+      },
+      {
+        "type": "keyTakeaway",
+        "body": "`viewDidLoad` once, appearance callbacks every time, layout whenever bounds change. Put construction in the first, refresh in the second, and anything geometry-dependent in the third.",
+        "id": "vc-lifecycle-s10"
+      }
+    ],
+    "quizIDs": [
+      "q-vc-lifecycle-1",
+      "q-vc-lifecycle-2",
+      "q-vc-lifecycle-3"
+    ],
+    "triviaIDs": [
+      "t-vc-lifecycle-1",
+      "t-vc-lifecycle-2"
+    ],
+    "interviewQuestionIDs": [
+      "i-vc-lifecycle-1"
+    ],
+    "relatedConceptIDs": [
+      "responder-chain",
+      "retain-cycles"
+    ],
+    "prerequisiteIDs": []
+  },
+  {
+    "id": "responder-chain",
+    "title": "The Responder Chain",
+    "subtitle": "How a touch or an action finds something willing to handle it.",
+    "categoryID": "uikit",
+    "difficulty": "intermediate",
+    "estimatedMinutes": 7,
+    "tags": [
+      "uikit",
+      "responder",
+      "events",
+      "first responder"
+    ],
+    "sections": [
+      {
+        "type": "explanation",
+        "body": "When something can't handle an event, UIKit passes it to the next object up a chain of `UIResponder`s. A view's next responder is usually its superview; the top view's is its view controller; a controller's is its parent or presenting controller, then the window, then the application, then the app delegate.\n\nThis is what makes `nil`-targeted actions work. `sendAction(_:to: nil, ...)` means \"walk up from the first responder until someone implements this\", which is how the system Cut/Copy/Paste menu reaches whichever text field is focused without anyone wiring it up.\n\nTwo separate mechanisms share the chain: hit testing decides *which view* a touch starts at, walking down the hierarchy; the responder chain decides *who handles it*, walking up.",
+        "id": "responder-chain-s1"
+      },
+      {
+        "type": "analogy",
+        "body": "It's an escalation path in a company.\n\nA question goes to the person in front of you. If they can't answer it, it goes to their manager, then that manager's manager, up to the director. The first person who can answer does, and the escalation stops there.\n\nIf nobody in the chain can answer, the question is quietly dropped — which is exactly what happens to an unhandled action, and why it fails silently rather than crashing.",
+        "id": "responder-chain-s2"
+      },
+      {
+        "type": "code",
+        "caption": "A `nil` target is the responder chain doing the routing for you.",
+        "code": "// Any responder can opt in by simply implementing the action\nfinal class CardView: UIView {\n    override var canBecomeFirstResponder: Bool { true }\n\n    @objc func markAsRead(_ sender: Any?) { … }\n\n    override func canPerformAction(_ action: Selector, withSender sender: Any?) -> Bool {\n        action == #selector(markAsRead) ? true : super.canPerformAction(action, withSender: sender)\n    }\n}\n\n// nil-target: \"whoever in the chain handles this\"\nUIApplication.shared.sendAction(#selector(CardView.markAsRead), to: nil, from: self, for: nil)\n\n// Dismissing the keyboard is the same trick — resign whoever is first responder\nUIApplication.shared.sendAction(\n    #selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil\n)",
+        "id": "responder-chain-s3"
+      },
+      {
+        "type": "diagram",
+        "title": "Walking up the chain",
+        "altText": "An event starts at a button, passes to its superview, then the view controller, then the window, application and app delegate until something handles it.",
+        "nodes": [
+          {
+            "id": "button",
+            "label": "UIButton",
+            "detail": "first responder",
+            "x": 0.5,
+            "y": 0.06,
+            "style": "view"
+          },
+          {
+            "id": "stack",
+            "label": "UIStackView",
+            "detail": "superview",
+            "x": 0.5,
+            "y": 0.24,
+            "style": "view"
+          },
+          {
+            "id": "root",
+            "label": "Root view",
+            "x": 0.5,
+            "y": 0.42,
+            "style": "view"
+          },
+          {
+            "id": "vc",
+            "label": "UIViewController",
+            "detail": "handles it here",
+            "x": 0.5,
+            "y": 0.6,
+            "style": "owner"
+          },
+          {
+            "id": "window",
+            "label": "UIWindow",
+            "x": 0.5,
+            "y": 0.78,
+            "style": "note"
+          },
+          {
+            "id": "app",
+            "label": "UIApplication → delegate",
+            "detail": "last stop",
+            "x": 0.5,
+            "y": 0.95,
+            "style": "note"
+          }
+        ],
+        "edges": [
+          {
+            "id": "c1",
+            "from": "button",
+            "to": "stack",
+            "label": "next",
+            "style": "flow"
+          },
+          {
+            "id": "c2",
+            "from": "stack",
+            "to": "root",
+            "label": "next",
+            "style": "flow"
+          },
+          {
+            "id": "c3",
+            "from": "root",
+            "to": "vc",
+            "label": "next",
+            "style": "flow"
+          },
+          {
+            "id": "c4",
+            "from": "vc",
+            "to": "window",
+            "label": "if unhandled",
+            "style": "dashed"
+          },
+          {
+            "id": "c5",
+            "from": "window",
+            "to": "app",
+            "label": "if unhandled",
+            "style": "dashed"
+          }
+        ],
+        "steps": [
+          {
+            "id": "s1",
+            "caption": "The event starts at the first responder.",
+            "nodeIDs": [
+              "button"
+            ],
+            "edgeIDs": []
+          },
+          {
+            "id": "s2",
+            "caption": "Each responder that can't handle it passes to the next one up.",
+            "nodeIDs": [
+              "stack",
+              "root"
+            ],
+            "edgeIDs": [
+              "c1",
+              "c2"
+            ]
+          },
+          {
+            "id": "s3",
+            "caption": "The first responder that implements the action handles it, and the walk stops.",
+            "nodeIDs": [
+              "vc"
+            ],
+            "edgeIDs": [
+              "c3"
+            ]
+          },
+          {
+            "id": "s4",
+            "caption": "If nobody does, it reaches the application and is silently discarded.",
+            "nodeIDs": [
+              "window",
+              "app"
+            ],
+            "edgeIDs": [
+              "c4",
+              "c5"
+            ]
+          }
+        ],
+        "id": "responder-chain-s4"
+      },
+      {
+        "type": "underTheHood",
+        "body": "Getting to the *start* of the chain is a separate pass. `hitTest(_:with:)` walks the view hierarchy downward, asking each view `point(inside:with:)`, and returns the deepest view containing the point. Views with `isUserInteractionEnabled == false`, `isHidden`, or `alpha <= 0.01` are skipped entirely — which is why a view with `alpha = 0` can't be tapped and one with `alpha = 0.02` can.\n\nA subview outside its parent's bounds is a common puzzle: it draws fine if the parent doesn't clip, but hit testing fails because the parent rejects the point before recursing. Overriding `point(inside:with:)` on the parent is the fix.\n\nNote the chain isn't strictly the view hierarchy. A presented view controller's next responder is its *presenting* controller, and `inputAccessoryView` and `UIMenuController` splice themselves in too.",
+        "id": "responder-chain-s5"
+      },
+      {
+        "type": "callout",
+        "style": "warning",
+        "title": "Expecting an unhandled action to fail loudly",
+        "body": "A `nil`-targeted action that nobody in the chain implements does nothing at all. No crash, no warning, no log. The button looks connected and simply doesn't work.\n\nWhen debugging one of these, walk the chain by printing `next` from the responder upward, and check `canPerformAction` on the responder you expected to handle it.",
+        "id": "responder-chain-s6"
+      },
+      {
+        "type": "quickCheck",
+        "refID": "q-responder-chain-1",
+        "id": "responder-chain-s7"
+      },
+      {
+        "type": "interview",
+        "refID": "i-responder-chain-1",
+        "id": "responder-chain-s8"
+      },
+      {
+        "type": "trivia",
+        "refID": "t-responder-chain-1",
+        "id": "responder-chain-s9"
+      },
+      {
+        "type": "keyTakeaway",
+        "body": "Hit testing walks down to find where a touch lands; the responder chain walks up to find who handles it. Unhandled actions vanish silently, so debug by walking `next`.",
+        "id": "responder-chain-s10"
+      }
+    ],
+    "quizIDs": [
+      "q-responder-chain-1",
+      "q-responder-chain-2",
+      "q-responder-chain-3"
+    ],
+    "triviaIDs": [
+      "t-responder-chain-1",
+      "t-responder-chain-2"
+    ],
+    "interviewQuestionIDs": [
+      "i-responder-chain-1"
+    ],
+    "relatedConceptIDs": [
+      "vc-lifecycle"
+    ],
+    "prerequisiteIDs": [
+      "vc-lifecycle"
+    ]
+  }
+]

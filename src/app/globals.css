@@ -1,26 +1,171 @@
 @import "tailwindcss";
 
+/* Design tokens ported from SwiftMind/DesignSystem/Theme.swift.
+   Spacing and radii need no custom tokens: the app's 2/4/8/12/16/24/32/48 scale is already
+   Tailwind's 4px grid, and its radii are rounded-lg / xl / 2xl / full. */
+
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  color-scheme: light;
+  --bg: #f7f7f9;
+  --surface: #ffffff;
+  --surface-raised: #ffffff;
+  --separator: #e3e3e8;
+  --text: #11111a;
+  --text-2: #6c6c78;
+  --accent: #4b3beb;
+  --success: #1b7f44;
+  --warning: #b26a00;
+  --danger: #c0392b;
+  --code-bg: #1b1b22;
+  /* Per-category accent. Overridden inline per subtree, so bg-cat/14, text-cat and
+     border-cat all follow the category without generating a class per colour. */
+  --cat: var(--accent);
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
+/* Duplicated deliberately: the media query handles "follow the system", the attribute
+   handles an explicit choice. Together they give a three-state toggle with no JS on paint
+   and no dependence on light-dark() support. */
 @media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg: #0e0e11;
+    --surface: #1a1a1f;
+    --surface-raised: #24242b;
+    --separator: #33333c;
+    --text: #f2f2f7;
+    --text-2: #9c9caa;
+    --accent: #8e82ff;
+    --success: #3dd68c;
+    --warning: #f5a623;
+    --danger: #ff6b5e;
+    --code-bg: #121217;
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #0e0e11;
+  --surface: #1a1a1f;
+  --surface-raised: #24242b;
+  --separator: #33333c;
+  --text: #f2f2f7;
+  --text-2: #9c9caa;
+  --accent: #8e82ff;
+  --success: #3dd68c;
+  --warning: #f5a623;
+  --danger: #ff6b5e;
+  --code-bg: #121217;
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-raised: var(--surface-raised);
+  --color-separator: var(--separator);
+  --color-text: var(--text);
+  --color-text-2: var(--text-2);
+  --color-accent: var(--accent);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-danger: var(--danger);
+  --color-code-bg: var(--code-bg);
+  --color-cat: var(--cat);
+
+  /* SF Pro Rounded via ui-rounded on Apple devices, platform UI font elsewhere.
+     Zero webfont bytes, zero layout shift. */
+  --font-rounded: ui-rounded, "SF Pro Rounded", "Hiragino Maru Gothic ProN", system-ui, sans-serif;
+  --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+
+  --ease-out: cubic-bezier(0, 0, 0.2, 1);
+  --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@layer base {
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-sans);
+    font-size: 1.0625rem;
+    line-height: 1.65;
+  }
+
+  h1,
+  h2,
+  h3 {
+    font-family: var(--font-rounded);
+    letter-spacing: -0.02em;
+  }
+
+  /* Never removed — the app's accessibility floor. */
+  :focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  ::selection {
+    background: color-mix(in oklab, var(--accent) 25%, transparent);
+  }
+}
+
+/* Motion is limited to two easings at 200–250ms, so one global switch covers it. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Elevation is border-only. There are no shadows anywhere in this design system. */
+@utility card {
+  border-radius: var(--radius-2xl);
+  border: 1px solid var(--separator);
+  background: var(--surface);
+}
+
+@utility title-xl {
+  font-family: var(--font-rounded);
+  font-weight: 700;
+  font-size: 2.25rem;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+}
+
+@utility title-m {
+  font-family: var(--font-rounded);
+  font-weight: 600;
+  font-size: 1.25rem;
+  line-height: 1.3;
+}
+
+@utility title-s {
+  font-family: var(--font-rounded);
+  font-weight: 600;
+  font-size: 1.0625rem;
+  line-height: 1.4;
+}
+
+@utility stat {
+  font-family: var(--font-rounded);
+  font-weight: 700;
+  font-size: 1.75rem;
+  line-height: 1.2;
+}
+
+@utility caption {
+  font-size: 0.8125rem;
+  line-height: 1.4;
+  font-weight: 500;
+}
+
+@media (max-width: 767px) {
+  .title-xl {
+    font-size: 1.875rem;
+  }
 }

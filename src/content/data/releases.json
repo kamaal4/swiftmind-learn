@@ -1,0 +1,120 @@
+[
+  {
+    "id": "swift-6-2",
+    "kind": "swift",
+    "version": "6.2",
+    "releasedOn": "2025-09-15",
+    "title": "Swift 6.2 — approachable concurrency",
+    "summary": "A direct response to how hard Swift 6's strict checking was to adopt. Most of this release is about letting single-threaded code stay single-threaded without fighting the compiler, so you opt into parallelism rather than out of it.",
+    "impact": "high",
+    "changes": [
+      {
+        "id": "swift-6-2-default-isolation",
+        "type": "changed",
+        "title": "Modules can default to main-actor isolation",
+        "detail": "A build setting lets a whole module be implicitly @MainActor. For UI code — which is already main-thread-bound — this removes most of the annotation churn that Swift 6 introduced, because the isolation you already had is now the default rather than something you restate on every type.",
+        "migration": "Turn it on per target for app and UI modules. Leave it off for shared model or networking modules, where isolation should stay explicit.",
+        "conceptIDs": ["main-actor", "actors"]
+      },
+      {
+        "id": "swift-6-2-concurrent",
+        "type": "new",
+        "title": "@concurrent marks the functions that actually leave the actor",
+        "detail": "Async functions no longer imply that they hop off the current actor. A function stays where it was called unless it is marked @concurrent, which makes the escape to a background thread visible at the declaration rather than inferred from context.",
+        "migration": "Mark genuinely parallel work @concurrent. If an async function only awaits other async work, it probably does not need it.",
+        "conceptIDs": ["async-await", "main-actor"]
+      },
+      {
+        "id": "swift-6-2-sendable-inference",
+        "type": "changed",
+        "title": "Fewer Sendable annotations required",
+        "detail": "Improved inference means a great deal of code that Swift 6.0 demanded be annotated now checks out on its own. The underlying data-race rules did not loosen — the compiler simply got better at proving what you already meant.",
+        "conceptIDs": ["sendable"]
+      }
+    ]
+  },
+  {
+    "id": "swift-6-0",
+    "kind": "swift",
+    "version": "6.0",
+    "releasedOn": "2024-09-16",
+    "title": "Swift 6.0 — data races become compile errors",
+    "summary": "The release the whole concurrency model was built toward. In Swift 6 language mode, code that could race is rejected at compile time rather than crashing intermittently in production.",
+    "impact": "high",
+    "changes": [
+      {
+        "id": "swift-6-0-language-mode",
+        "type": "new",
+        "title": "Swift 6 language mode enforces complete concurrency checking",
+        "detail": "Opt in per module. Sendable violations and cross-actor access that were warnings in Swift 5 mode become errors. This is the single largest source of migration work in a mature codebase, and it is deliberately opt-in per target so you can move one module at a time.",
+        "migration": "Enable complete concurrency checking in Swift 5 mode first and clear the warnings. Only then switch the module to Swift 6 mode.",
+        "conceptIDs": ["sendable", "actors", "main-actor"]
+      },
+      {
+        "id": "swift-6-0-typed-throws",
+        "type": "new",
+        "title": "Typed throws",
+        "detail": "A function can declare the concrete error type it throws with `throws(MyError)`. Useful in constrained code and generic algorithms that need to propagate an error type precisely; ordinary application code is usually still better served by untyped throws.",
+        "conceptIDs": ["protocols"]
+      }
+    ]
+  },
+  {
+    "id": "ios-17-observation",
+    "kind": "ios",
+    "version": "17",
+    "releasedOn": "2023-09-18",
+    "title": "iOS 17 — the Observation framework",
+    "summary": "@Observable replaces ObservableObject for most SwiftUI state, and changes which views actually redraw.",
+    "impact": "high",
+    "changes": [
+      {
+        "id": "ios-17-observable",
+        "type": "new",
+        "title": "@Observable tracks property access instead of object change",
+        "detail": "With ObservableObject, any @Published change redrew every view observing the object. @Observable tracks which properties a view's body actually read, so a view only redraws when something it genuinely uses changes. This usually removes a whole class of over-rendering without any work beyond adopting the macro.",
+        "migration": "Replace ObservableObject + @Published with @Observable, and @StateObject/@ObservedObject with @State or a plain property.",
+        "conceptIDs": ["observation", "state", "binding"]
+      },
+      {
+        "id": "ios-17-observedobject",
+        "type": "deprecated",
+        "title": "ObservableObject is now the legacy path",
+        "detail": "Still supported, but new code should not reach for it. It remains necessary only when deploying below iOS 17.",
+        "conceptIDs": ["observation"]
+      }
+    ]
+  },
+  {
+    "id": "swift-5-9",
+    "kind": "swift",
+    "version": "5.9",
+    "releasedOn": "2023-09-18",
+    "title": "Swift 5.9 — macros and ownership",
+    "summary": "Macros arrive as a first-class language feature, and the ownership model gains noncopyable types.",
+    "impact": "medium",
+    "changes": [
+      {
+        "id": "swift-5-9-macros",
+        "type": "new",
+        "title": "Macros",
+        "detail": "Compile-time code generation with full type information. This is the mechanism behind @Observable and much of SwiftData, so understanding what a macro expands to is now part of reading ordinary framework code.",
+        "conceptIDs": ["observation"]
+      },
+      {
+        "id": "swift-5-9-noncopyable",
+        "type": "new",
+        "title": "Noncopyable types (~Copyable)",
+        "detail": "A type can declare that it must not be copied, giving the compiler enough information to enforce unique ownership of a resource. Relevant when a value represents something that genuinely cannot be duplicated, such as a file handle or a lock.",
+        "conceptIDs": ["struct-vs-class"]
+      },
+      {
+        "id": "swift-5-9-if-expressions",
+        "type": "new",
+        "title": "if and switch as expressions",
+        "detail": "Both can now produce a value directly, which removes a great deal of `var x: T` followed by assignment in every branch.",
+        "conceptIDs": ["optionals"]
+      }
+    ]
+  }
+]
