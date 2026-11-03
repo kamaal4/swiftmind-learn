@@ -1,8 +1,8 @@
 import type { NextConfig } from "next";
 
-// GitHub Pages serves this as a project site from /swiftmind-learn/, so the build needs a
-// base path. It is read from the environment rather than hardcoded, so a local build (and a
-// future custom domain) can serve from the root with no code change.
+// Cloudflare serves the export from the domain root, so no base path is set there. A host
+// that serves it from a sub-path (e.g. a GitHub Pages project site at /swiftmind-learn/)
+// sets NEXT_PUBLIC_BASE_PATH at build time; nothing else changes.
 const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
 
 const nextConfig: NextConfig = {

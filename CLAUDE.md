@@ -9,24 +9,27 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `npm test` — `node --test` over `src/**/*.test.ts`
 - `npm run content:check` — validates all content JSON (Zod + cross-references)
 - `npm run lint` — ESLint flat config
+- `npm run ci` — all of the above plus the build; Cloudflare's build command
 
 Node 26 runs TypeScript natively, so tests and scripts need no transpiler. Run one test file with `node --test src/learning/scheduler.test.ts`.
 
 ## What this is
 
-A web port of the SwiftMind iOS app (`/Users/mustafa/Personal/Owned/SwiftMind`), which remains the source of truth for content and learning logic. The premise: *understand iOS, don't just memorise it* — every concept is a structured lesson (explanation, analogy, stepped diagram, code, common mistake, quick check, interview question), never an article.
+A web port of the SwiftMind iOS app (`/Users/mustafa/Personal/Owned/SwiftMind`), which remains the source of truth for learning logic. **Content is now canonical here**: it is edited at `/admin`, and the iOS app copies `src/content/data/*.json` from this repo. The premise: *understand iOS, don't just memorise it* — every concept is a structured lesson (explanation, analogy, stepped diagram, code, common mistake, quick check, interview question), never an article.
 
 No backend, no accounts. Progress lives in `localStorage` only.
 
 ## Architecture
 
-**Content** (`src/content/`) — the 9 JSON files in `data/` are copied verbatim from the iOS app's `Content/Resources/`, so both stay content-compatible; `releases.json` is web-only. `index.ts` is a port of `ContentStore` exposing a frozen `content` object plus a `makeContent()` factory used by tests. JSON is imported statically with `with { type: "json" }` — required by Node ESM and accepted by Turbopack.
+**Content** (`src/content/`) — the JSON files in `data/` share their shape with the iOS app's `Content/Resources/` (each file is a top-level array), so the app can copy them unchanged; `releases.json` is web-only. `index.ts` is a port of `ContentStore` exposing a frozen `content` object plus a `makeContent()` factory used by tests. JSON is imported statically with `with { type: "json" }` — required by Node ESM and accepted by Turbopack.
 
 `schema.ts` holds Zod schemas that run **only** in `scripts/content-check.ts`, never at runtime; the app imports typed JSON and parses nothing. `ConceptSection` is deliberately the *known* union only — adding a `type: string` member would defeat narrowing in the renderer's switch. `references.ts` ports `ContentValidator.swift` (cross-references, duplicate ids, diagram integrity).
 
 **Learning engine** (`src/learning/`) — pure functions ported from the iOS app, with no React or storage dependency: `scheduler.ts` (Leitner intervals 1→3→7→16→35, mastery EMA at 0.3, wrong answer resets to 1), `quiz.ts` (six modes, daily quiz seeded by day number so it is stable all day), `derive.ts` (streak, mastery, review queue, recommendations), `date.ts`, `rng.ts` (mulberry32).
 
 **Progress** (`src/progress/`) — `types.ts` and the pure `reduce.ts` reducer, with `store.ts` the single module that touches `localStorage`. It uses `useSyncExternalStore` whose server snapshot is always empty state, so static HTML and the hydration render agree. Adding cloud sync later should touch `store.ts` alone.
+
+**Editor** (`public/admin/`) — Sveltia CMS, version pinned in `index.html`. `config.yml` maps each data file to one collection (`file:` — every array element is an entry), mirroring `schema.ts` field for field in each file's key order. Each save commits to `main`; Cloudflare runs `npm run ci`, so content that fails `content:check` never deploys. The GitHub login is the only Worker code (`worker/sveltia-cms-auth.js`, vendored unchanged; `wrangler.jsonc` routes just `/oauth/*` to it), and `sw.js` never intercepts `/admin/` or `/oauth/`. Sveltia rewrites only the saved entry, but it moves `id` earlier in most section types the first time an entry is saved. That is a key-order-only diff and harmless.
 
 **UI** — server components by default; client islands only where local progress or interaction lives (`progress-islands.tsx`, `QuizRunner`, `Diagram`, `CommandPalette`, `ThemeToggle`). Every route is statically generated.
 
@@ -37,4 +40,6 @@ No backend, no accounts. Progress lives in `localStorage` only.
 - **Elevation is border-only. There are no shadows anywhere.**
 - **State is never signalled by colour alone** — every state carries a glyph or a word. This applies to mastery badges, quiz results, and diagram edges.
 - Prefer native HTML over JS: `<details>` for reveals and code collapse, radio inputs for quiz options, `<dialog>` for the command palette.
-- Adding content means adding JSON and running `content:check`; no code change should be required.
+- Adding content means adding JSON (or using `/admin`) and running `content:check`; no code change should be required.
+- **A field added to `schema.ts` must also be added to `public/admin/config.yml`** — the editor drops keys it doesn't know when it saves an entry.
+- The editor omits blank optional values instead of writing `""`, and that includes an optional list saved empty. Only `prerequisiteIDs`, a diagram step's `edgeIDs` and a release change's `conceptIDs` are optional lists; `makeContent` reads a missing one as `[]`, and the iOS decoder must do the same.

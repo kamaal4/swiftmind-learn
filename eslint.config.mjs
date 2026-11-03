@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Vendored unchanged from sveltia-cms-auth; kept byte-identical rather than linted.
+    "worker/**",
   ]),
 ]);
 

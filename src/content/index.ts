@@ -38,13 +38,23 @@ export type ContentInput = {
 // build a store from fixtures instead of the real bundle.
 export const makeContent = (input: ContentInput) => {
   const categories = input.categories.slice().sort((a, b) => a.order - b.order);
-  const concepts = input.concepts.slice();
+  // The /admin editor omits a list that is saved empty, so read a missing optional list as [].
+  // Only these three are optional there (public/admin/config.yml); every other list is required.
+  const concepts: Concept[] = input.concepts.map((c) => ({
+    ...c,
+    prerequisiteIDs: c.prerequisiteIDs ?? [],
+    sections: c.sections.map((s) =>
+      s.type === "diagram"
+        ? { ...s, steps: s.steps.map((step) => ({ ...step, edgeIDs: step.edgeIDs ?? [] })) }
+        : s,
+    ) as Concept["sections"],
+  }));
   const quizzes = input.quizzes.slice();
   const trivia = input.trivia.slice();
   const interview = input.interview.slice();
   const releases = (input.releases ?? [])
-    .slice()
-    .sort((a, b) => b.releasedOn.localeCompare(a.releasedOn));
+    .map((r) => ({ ...r, changes: r.changes.map((ch) => ({ ...ch, conceptIDs: ch.conceptIDs ?? [] })) }))
+    .sort((a, b) => b.releasedOn.localeCompare(a.releasedOn)) as Release[];
 
   const conceptByID = byID(concepts);
   const quizByID = byID(quizzes);

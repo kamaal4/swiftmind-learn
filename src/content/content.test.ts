@@ -102,6 +102,14 @@ test("a concept with no sections fails the schema", () => {
   assert.equal(conceptSchema.safeParse({ ...concept, sections: [] }).success, false);
 });
 
+test("a list the /admin editor omitted when empty is read as empty", () => {
+  const saved: Partial<typeof concept> = { ...concept };
+  delete saved.prerequisiteIDs;
+  const store = makeContent({ ...base, concepts: [saved as typeof concept] });
+  assert.deepEqual(store.concepts[0].prerequisiteIDs, []);
+  assert.deepEqual(validateReferences(store), []);
+});
+
 test("the store indexes concepts by category, sorted by difficulty then title", () => {
   const graph = makeContent({
     ...base,

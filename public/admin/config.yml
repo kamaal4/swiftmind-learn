@@ -1,0 +1,278 @@
+# yaml-language-server: $schema=https://unpkg.com/@sveltia/cms@0.230.0/schema/sveltia-cms.json
+# Editor for the SwiftMind course. Every save is a commit to main, which Cloudflare rebuilds and
+# deploys in ~1-2 minutes. A save that breaks the content fails `npm run content:check` in that
+# build, so the previous version stays live.
+#
+# Fields mirror src/content/schema.ts, in each file's existing key order. A field missing here is
+# dropped from an entry when it is saved, so add new schema fields here too.
+app_title: SwiftMind editor
+
+backend:
+  name: github
+  repo: kamaal4/swiftmind-learn
+  branch: main
+  # The login handler is worker/sveltia-cms-auth.js on the same site (wrangler.jsonc routes
+  # /oauth/* to it). Must be the host in wrangler.jsonc's ALLOWED_DOMAINS.
+  base_url: https://swiftmind.ACCOUNT.workers.dev
+  auth_endpoint: oauth/authorize
+  # Enough to write to a public repo. Switch to `repo` if the repository is ever made private.
+  auth_scope: public_repo
+  auth_methods: [oauth]
+
+# Required by Sveltia even though no content field takes an image; nothing is uploaded today.
+media_folder: public/uploads
+public_folder: /uploads
+
+# Blank optional text is left out rather than saved as "" (content:check rejects blank strings).
+# This also omits an optional list saved empty; src/content/index.ts reads a missing one as [].
+output:
+  omit_empty_optional_fields: true
+
+collections:
+  - divider: true
+    name: concepts-divider
+
+  - &concepts
+    name: concepts-swift
+    label: Swift concepts
+    label_singular: Swift concept
+    file: src/content/data/concepts-swift.json
+    format: json
+    identifier_field: title
+    summary: '{{title}} · {{difficulty}}'
+    preview_path: /learn/{{categoryID}}/{{id}}/
+    fields:
+      - { name: id, label: ID, widget: string, hint: 'Unique, lowercase-with-dashes. Becomes the URL /learn/<category>/<id>/ — avoid renaming.' }
+      - { name: title, label: Title, widget: string }
+      - { name: subtitle, label: Subtitle, widget: string }
+      - &categoryID { name: categoryID, label: Category, widget: relation, collection: categories, value_field: id, display_fields: [name], search_fields: [name, id] }
+      - &difficulty { name: difficulty, label: Difficulty, widget: select, options: [beginner, intermediate, advanced, senior] }
+      - { name: estimatedMinutes, label: Estimated minutes, widget: number, value_type: int, min: 1 }
+      - { name: tags, label: Tags, widget: list, min: 1, field: { name: tag, label: Tag, widget: string } }
+      - name: sections
+        label: Sections
+        label_singular: Section
+        widget: list
+        min: 1
+        hint: 'A lesson reads top to bottom: explanation, analogy, diagram, code, the common mistake, a quick check, the interview question.'
+        types:
+          - name: explanation
+            label: Explanation
+            widget: object
+            summary: '{{body}}'
+            fields:
+              - &heading { name: heading, label: Heading (optional), widget: string, required: false, hint: "Overrides the section's default heading." }
+              # Body text supports `code`, **bold**, blank-line paragraphs and "- " / "1. " lists; nothing else is formatted.
+              - &body { name: body, label: Body, widget: text, hint: 'Supports `code`, **bold**, blank-line paragraphs and "- " / "1. " lists.' }
+              - &id { name: id, label: ID, widget: string, hint: 'Unique, lowercase-with-dashes. Other entries refer to it, so avoid renaming.' }
+          - { name: analogy, label: Analogy, widget: object, summary: '{{body}}', fields: [*heading, *body, *id] }
+          - { name: underTheHood, label: Under the hood, widget: object, summary: '{{body}}', fields: [*heading, *body, *id] }
+          - { name: keyTakeaway, label: Key takeaway, widget: object, summary: '{{body}}', fields: [*heading, *body, *id] }
+          - name: code
+            label: Code
+            widget: object
+            summary: '{{caption}}'
+            fields:
+              - *heading
+              - { name: caption, label: Caption (optional), widget: string, required: false }
+              - { name: code, label: Swift code, widget: text }
+              - *id
+          - name: callout
+            label: Callout
+            widget: object
+            summary: '{{style}} · {{title}}'
+            fields:
+              - { name: style, label: Style, widget: select, options: [mistake, warning, tip, note] }
+              - { name: title, label: Title, widget: string }
+              - *body
+              - *id
+          - name: diagram
+            label: Diagram
+            widget: object
+            summary: '{{title}}'
+            fields:
+              - { name: title, label: Title, widget: string }
+              - { name: altText, label: Text alternative, widget: text, hint: 'What the diagram shows, for screen readers.' }
+              - name: nodes
+                label: Nodes
+                widget: list
+                min: 1
+                summary: '{{id}} · {{label}}'
+                fields:
+                  - { name: id, label: ID, widget: string, hint: 'Edges and steps refer to it.' }
+                  - { name: label, label: Label, widget: string }
+                  - { name: detail, label: Detail (optional), widget: string, required: false }
+                  - { name: x, label: 'X (0 = left, 1 = right)', widget: number, value_type: float, min: 0, max: 1, step: 0.01 }
+                  - { name: y, label: 'Y (0 = top, 1 = bottom)', widget: number, value_type: float, min: 0, max: 1, step: 0.01 }
+                  - { name: style, label: Style, widget: select, options: [object, owner, closure, actorBox, thread, view, note] }
+              - name: edges
+                label: Edges
+                widget: list
+                summary: '{{from}} → {{to}} · {{style}}'
+                fields:
+                  - { name: id, label: ID, widget: string, hint: 'Steps refer to it.' }
+                  - { name: from, label: From node ID, widget: string }
+                  - { name: to, label: To node ID, widget: string }
+                  - { name: label, label: Label (optional), widget: string, required: false }
+                  - { name: style, label: Style, widget: select, options: [strong, weak, unowned, flow, dashed] }
+              - name: steps
+                label: Steps
+                widget: list
+                summary: '{{caption}}'
+                fields:
+                  - { name: id, label: ID, widget: string }
+                  - { name: caption, label: Caption, widget: text }
+                  - { name: nodeIDs, label: Highlighted node IDs, widget: list, min: 1, field: { name: node, label: Node ID, widget: string } }
+                  - { name: edgeIDs, label: Highlighted edge IDs, widget: list, required: false, field: { name: edge, label: Edge ID, widget: string } }
+              - *id
+          - name: quickCheck
+            label: Quick check
+            widget: object
+            summary: '{{refID}}'
+            fields:
+              - { name: refID, label: Quiz question, widget: relation, collection: quizzes, value_field: id, display_fields: ['{{id}} · {{prompt}}'], search_fields: [id, prompt] }
+              - *id
+          - name: trivia
+            label: Trivia
+            widget: object
+            summary: '{{refID}}'
+            fields:
+              - { name: refID, label: Trivia item, widget: relation, collection: trivia, value_field: id, display_fields: ['{{id}} · {{text}}'], search_fields: [id, text] }
+              - *id
+          - name: interview
+            label: Interview question
+            widget: object
+            summary: '{{refID}}'
+            fields:
+              - { name: refID, label: Interview question, widget: relation, collection: interview, value_field: id, display_fields: ['{{id}} · {{question}}'], search_fields: [id, question] }
+              - *id
+      - { name: quizIDs, label: Quiz questions, widget: relation, collection: quizzes, value_field: id, multiple: true, display_fields: ['{{id}} · {{prompt}}'], search_fields: [id, prompt], hint: 'In the order they are asked.' }
+      - { name: triviaIDs, label: Trivia, widget: relation, collection: trivia, value_field: id, multiple: true, display_fields: ['{{id}} · {{text}}'], search_fields: [id, text] }
+      - { name: interviewQuestionIDs, label: Interview questions, widget: relation, collection: interview, value_field: id, multiple: true, display_fields: ['{{id}} · {{question}}'], search_fields: [id, question] }
+      - { name: relatedConceptIDs, label: Related concept IDs, widget: list, min: 1, field: { name: concept, label: Concept ID, widget: string } }
+      - { name: prerequisiteIDs, label: Prerequisite concept IDs, widget: list, required: false, field: { name: concept, label: Concept ID, widget: string } }
+
+  - { <<: *concepts, name: concepts-memory, label: Memory concepts, label_singular: Memory concept, file: src/content/data/concepts-memory.json }
+  - { <<: *concepts, name: concepts-concurrency, label: Concurrency concepts, label_singular: Concurrency concept, file: src/content/data/concepts-concurrency.json }
+  - { <<: *concepts, name: concepts-uikit, label: UIKit concepts, label_singular: UIKit concept, file: src/content/data/concepts-uikit.json }
+  - { <<: *concepts, name: concepts-swiftui, label: SwiftUI concepts, label_singular: SwiftUI concept, file: src/content/data/concepts-swiftui.json }
+
+  - divider: true
+    name: practice-divider
+
+  - name: quizzes
+    label: Quiz questions
+    label_singular: Quiz question
+    file: src/content/data/quizzes.json
+    format: json
+    identifier_field: id
+    summary: '{{id}} · {{prompt}}'
+    fields:
+      - *id
+      - &conceptID { name: conceptID, label: Concept ID, widget: string, hint: 'The id of a concept, e.g. arc. Must belong to the category below.' }
+      - *categoryID
+      - { name: kind, label: Kind, widget: select, options: [multipleChoice, trueFalse, scenario, code, whatHappensNext] }
+      - { name: prompt, label: Prompt, widget: text }
+      - { name: code, label: Code (optional), widget: text, required: false }
+      - name: options
+        label: Options
+        widget: list
+        min: 2
+        summary: '{{id}} · {{text}}'
+        fields:
+          - { name: id, label: ID, widget: string, hint: 'Short, e.g. a, b, c, d.' }
+          - { name: text, label: Text, widget: text }
+      - { name: correctOptionID, label: Correct option ID, widget: string, hint: 'The ID of one of the options above, e.g. b.' }
+      - { name: explanation, label: Explanation, widget: text }
+      - *difficulty
+
+  - name: trivia
+    label: Trivia
+    label_singular: Trivia item
+    file: src/content/data/trivia.json
+    format: json
+    identifier_field: id
+    summary: '{{id}} · {{text}}'
+    fields:
+      - *id
+      - *conceptID
+      - *categoryID
+      - { name: text, label: Text, widget: text }
+      - { name: detail, label: Detail (optional), widget: text, required: false }
+
+  - name: interview
+    label: Interview questions
+    label_singular: Interview question
+    file: src/content/data/interview.json
+    format: json
+    identifier_field: id
+    summary: '{{level}} · {{question}}'
+    fields:
+      - *id
+      - *conceptID
+      - *categoryID
+      - { name: level, label: Level, widget: select, options: [junior, mid, senior, staff] }
+      - { name: question, label: Question, widget: text }
+      - { name: answer, label: Answer, widget: text }
+      - { name: keyPoints, label: What the interviewer listens for, widget: list, min: 1, field: { name: point, label: Key point, widget: string } }
+      - name: followUps
+        label: Follow-ups
+        widget: list
+        summary: '{{question}}'
+        fields:
+          - { name: id, label: ID, widget: string }
+          - { name: question, label: Question, widget: text }
+          - { name: answer, label: Answer, widget: text }
+
+  - divider: true
+    name: site-divider
+
+  - name: releases
+    label: Release Radar
+    label_singular: Release
+    file: src/content/data/releases.json
+    format: json
+    identifier_field: title
+    summary: '{{kind}} {{version}} · {{title}}'
+    sortable_fields: [releasedOn, version]
+    preview_path: /whats-new/{{id}}/
+    fields:
+      - { name: id, label: ID, widget: string, hint: 'Becomes the URL /whats-new/<id>/, e.g. swift-6-2.' }
+      - { name: kind, label: Kind, widget: select, options: [swift, ios, xcode] }
+      - { name: version, label: Version, widget: string, hint: 'e.g. 6.2' }
+      - { name: releasedOn, label: Released on, widget: datetime, type: date, format: YYYY-MM-DD }
+      - { name: title, label: Title, widget: string }
+      - { name: summary, label: Summary, widget: text }
+      - { name: impact, label: Impact, widget: select, options: [high, medium, low] }
+      - name: changes
+        label: Changes
+        widget: list
+        min: 1
+        summary: '{{type}} · {{title}}'
+        fields:
+          - { name: id, label: ID, widget: string }
+          - { name: type, label: Type, widget: select, options: [new, changed, deprecated, removed] }
+          - { name: title, label: Title, widget: string }
+          - { name: detail, label: Detail, widget: text }
+          - { name: migration, label: How to migrate (optional), widget: text, required: false }
+          - { name: conceptIDs, label: Related concept IDs, widget: list, required: false, field: { name: concept, label: Concept ID, widget: string } }
+          - { name: link, label: Link (optional), widget: string, required: false, hint: 'Full URL, e.g. https://www.swift.org/blog/…' }
+
+  - name: categories
+    label: Categories
+    label_singular: Category
+    file: src/content/data/categories.json
+    format: json
+    identifier_field: name
+    summary: '{{order}} · {{name}}'
+    fields:
+      - { name: id, label: ID, widget: string, hint: 'Becomes the URL /learn/<id>/ and is referred to by every concept — avoid renaming.' }
+      - { name: name, label: Name, widget: string }
+      - { name: summary, label: Summary, widget: text }
+      - { name: systemImage, label: SF Symbol (iOS app), widget: string, hint: 'An SF Symbols name, e.g. memorychip. The website does not show it.' }
+      - name: accentHex
+        label: Accent colour
+        widget: string
+        hint: 'Six hex digits without #, e.g. F05138.'
+        pattern: ['^[0-9A-Fa-f]{6}$', 'Six hex digits without #, e.g. F05138']
+      - { name: order, label: Order, widget: number, value_type: int, min: 1 }

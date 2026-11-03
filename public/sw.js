@@ -43,6 +43,9 @@ self.addEventListener("fetch", (event) => {
 
   const url = new URL(request.url);
   if (url.origin !== self.location.origin) return;
+  // The /admin editor must always load its current config, and the /oauth login callback
+  // carries a GitHub token, which must never be written to the cache.
+  if (url.pathname.startsWith(`${BASE}admin/`) || url.pathname.startsWith(`${BASE}oauth/`)) return;
 
   // Content changes often, so pages are network-first: a cached lesson is the fallback, not
   // the default. Build output under _next/static is content-hashed, so it is cache-first.
