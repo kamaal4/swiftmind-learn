@@ -4,7 +4,7 @@
 
 A learning platform for iOS developers: Swift, memory management, concurrency, UIKit and SwiftUI, from beginner to senior level. Every concept is a structured lesson — a plain-English explanation, a real-world analogy, a diagram you can step through, real code, the common mistake, a quick check, and the interview question behind it. Never a wall of prose.
 
-**Live at [swiftmind.ACCOUNT.workers.dev](https://swiftmind.ACCOUNT.workers.dev/)**
+**Live at [swiftmind.mkamaalg4.workers.dev](https://swiftmind.mkamaalg4.workers.dev/)**
 
 This is the web companion to the SwiftMind iOS app. Content and learning logic are shared with the app rather than reinvented, so the two stay in step. The content is edited here, and the app copies it.
 
@@ -38,7 +38,7 @@ Adding a concept means adding JSON under `src/content/data/` and running `npm ru
 
 ## Editing content
 
-Content is edited at **https://swiftmind.ACCOUNT.workers.dev/admin/** with [Sveltia CMS](https://sveltiacms.app) (`public/admin/`). Every save is a commit to `main`. Cloudflare rebuilds, and the change is live in 1–2 minutes.
+Content is edited at **https://swiftmind.mkamaalg4.workers.dev/admin/** with [Sveltia CMS](https://sveltiacms.app) (`public/admin/`). Every save is a commit to `main`. Cloudflare rebuilds, and the change is live in 1–2 minutes.
 
 If a save breaks the content, the build fails and the previous version stays live. That covers a quiz pointing at a concept that doesn't exist, a diagram step highlighting a missing node, or a duplicate id: anything `npm run content:check` rejects. Failed builds show under **Cloudflare → Workers & Pages → swiftmind → Deployments**.
 
@@ -66,7 +66,7 @@ The site is a Cloudflare **Worker with static assets** (`wrangler.jsonc`), conne
 | Build command `npm run ci`, deploy command `npx wrangler deploy` | swiftmind → Settings → Build |
 | `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET` | swiftmind → Settings → Variables and Secrets (type Secret) |
 | `ALLOWED_DOMAINS` (sites the login may serve) | `vars` in `wrangler.jsonc` |
-| OAuth callback `https://swiftmind.ACCOUNT.workers.dev/oauth/redirect` | GitHub → Settings → Developer settings → OAuth Apps → SwiftMind editor |
+| OAuth callback `https://swiftmind.mkamaalg4.workers.dev/oauth/redirect` | GitHub → Settings → Developer settings → OAuth Apps → SwiftMind editor |
 
 The host appears in `wrangler.jsonc` (`ALLOWED_DOMAINS`), `public/admin/config.yml` (`base_url`) and the OAuth app. Change all three together.
 

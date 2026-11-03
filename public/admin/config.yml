@@ -13,7 +13,7 @@ backend:
   branch: main
   # The login handler is worker/sveltia-cms-auth.js on the same site (wrangler.jsonc routes
   # /oauth/* to it). Must be the host in wrangler.jsonc's ALLOWED_DOMAINS.
-  base_url: https://swiftmind.ACCOUNT.workers.dev
+  base_url: https://swiftmind.mkamaalg4.workers.dev
   auth_endpoint: oauth/authorize
   # Enough to write to a public repo. Switch to `repo` if the repository is ever made private.
   auth_scope: public_repo

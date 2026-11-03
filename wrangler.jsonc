@@ -13,6 +13,6 @@
   "vars": {
     // Only these sites may receive a token from the login popup. Same host as base_url in
     // public/admin/config.yml.
-    "ALLOWED_DOMAINS": "swiftmind.ACCOUNT.workers.dev"
+    "ALLOWED_DOMAINS": "swiftmind.mkamaalg4.workers.dev"
   }
 }
